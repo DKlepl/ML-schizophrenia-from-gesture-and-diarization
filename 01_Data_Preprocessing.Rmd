@@ -1,0 +1,38 @@
+---
+title: "Data preprocessing"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+pacman::p_load(tidyverse, hms)
+```
+
+# 1) Data overview
+  A) 'Audio' contains recordings from the interviews in wav format.
+  B) 'Diarization' contains turn-taking data automatically extracted from the audio recordings. There are raw data in .seg format and cleaned up data in .csv.
+  C) 'Gesture' containts raw data from the actigraphs (wrist movement sensors). This was originally measured as changes in acceleration on 3 axis which were meaningless and so euclidian distance was calculated.
+  D) 'Timing_Handedness.txt' contains hand-notes about start time of the gesturing and voice start, handedness of the subject and schizophrenia symptoms.
+
+## 1.1) Look at one sample from all data types
+```{r first look}
+#turn-taking sample
+turn = read.csv("raw_data/Diarization/101.csv")
+
+#gesture sample
+gest = read.csv('raw_data/Gesture/Sub101RightHanded.csv')
+```
+
+```{r clean Timing_Handedness.txt}
+#strinAsFactors=F because time-data would get converted to factors
+Timing = read.delim("raw_data/Timing_Handedness.txt", na.strings="NaN", stringsAsFactors=F)
+
+#all time-data needs to be converted to hms format from strings - I'll need to calculate with them
+#Diff is difference between VoiceStart and GestureStart in seconds
+Timing = Timing %>% mutate(
+  GestureStart=as.hms(GestureStart),
+  VoiceStart=as.hms(VoiceStart),
+  Diff=VoiceStart-GestureStart
+)
+```
+
+  

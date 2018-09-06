@@ -4,7 +4,7 @@ output: html_document
 ---
 
 ```{r setup, include=FALSE}
-pacman::p_load(tidyverse, hms)
+pacman::p_load(tidyverse, hms, tuneR)
 ```
 
 # 1) Data overview
@@ -17,9 +17,78 @@ pacman::p_load(tidyverse, hms)
 ```{r first look}
 #turn-taking sample
 turn = read.csv("raw_data/Diarization/101.csv")
+```
 
+```{r}
+#audio sample
+audio = readWave("raw_data/Audio/201.wav")
+sampling = audio@samp.rate #22050
+plot(audio@left[1:(20*sampling)])
+
+test = audio@left[(0*sampling):(10*sampling)]
+
+#library(pracma)
+# plot(test, type="l", col="navy")
+# x = findpeaks(test, minpeakheight = 0.98, nups = 1,ndowns = 2, minpeakdistance = (0.05*sampling))
+# points(x[, 2], x[, 1],col="red", pch=20)
+
+#use soundgen's algorithm to find bursts of acoustic energy in the signal
+#it's intended for syllable segmentation but it works well
+library(soundgen)
+seg = segment(test, samplingRate = sampling, plot = T)
+burts = seg$bursts
+syl = seg$syllables
+
+#OPTIONAL - optimze parameters of algorithm to detect claps
+#key containing correct number of claps
+key = rep(3, 10)
+res = optimizePars(myfolder = "raw_data/audio_known", myfun = 'segmentFolder', key = key,
+  pars = c('shortestSyl', 'shortestPause', 'sylThres'),
+  fitnessPar = 'nBursts',
+  nIter = 3, control = list(maxit = 50, reltol = .01, trace = 0))
+
+#how to identify the 3 bursts from claps?
+#calculate SD with a sliding window - the lowest = 3 rhythmic claps
+library(evobiR)
+sd = SlidingWindow("sd",burts$interburstInt , 3, 1)
+
+#get the time of the claps
+clap = which.min(sd)
+claps = data.frame(audioclap1 = burts[clap, 'time'], audioclap2 = burts[clap+1, 'time'], audioclap3 = burts[clap+2, 'time'])
+```
+
+Find claps in the actigraphs
+```{r}
 #gesture sample
-gest = read.csv('raw_data/Gesture/Sub101RightHanded.csv')
+gest = read.csv('raw_data/Gesture/Sub103RightHanded.csv')
+gest = na.omit(gest)
+
+#sampling is 100 Hz => 1 datapoint = 10 ms
+sampling_acti = 100
+test = gest
+
+#this is how the claps look like in the actigraph
+ggplot(gest[48000:49000,])+
+   geom_line(aes((48000:49000)/100,PsychologistJerkLeft),color="blue")
+
+ggplot(gest[48000:49000,])+
+   geom_line(aes((48000:49000)/100,PsychologistJerkRight),color="blue")
+
+#find peaks in each hand
+#subtract the peaks - the 3 closest to each other in time are the claps
+library(pracma)
+plot(test$PsychologistJerkLeft, type="l", col="navy")
+x_left = findpeaks(test$PsychologistJerkLeft, minpeakheight = 2, npeaks = 3)
+points(x_left[, 2], x_left[, 1],col="red", pch=20)
+
+plot(test$PsychologistJerkRight, type="l", col="navy")
+x_right = findpeaks(test$PsychologistJerkRight, minpeakheight = 2, npeaks = 3)
+points(x_right[, 2], x_right[, 1],col="red", pch=20)
+
+
+x = cbind(x_left,x_right)
+x = as.data.frame(x)
+x$diff = x_left[,2] - x_right[,2]
 ```
 
 ```{r clean Timing_Handedness.txt}
@@ -34,5 +103,5 @@ Timing = Timing %>% mutate(
   Diff=VoiceStart-GestureStart
 )
 ```
-
+  
   

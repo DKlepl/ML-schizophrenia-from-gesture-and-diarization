@@ -15,13 +15,6 @@ pacman::p_load(tidyverse, hms, tuneR)
 
 ## 1. Build/find an algorithm for claps detection in audio
 ```{r audio algorithm build-up}
-#place to store all claps
-audio_claps = data.frame(id=character(),
-                         diagnosis=numeric(),
-                         audio_clap1=numeric(),
-                         audio_clap2=numeric(),
-                         audio_clap3=numeric())
-
 #read audio file
 audio_path = "raw_data/Audio"
 audio_files = list.files(path=audio_path, full.names = T) 
@@ -47,7 +40,7 @@ test = audio@left[(0):(10*sampling)]
 #it's intended for syllable segmentation but it works well
 library(soundgen)
 seg = segment(test, samplingRate = sampling,windowLength = 40, plot = T )
-burts = seg$bursts
+bursts = seg$bursts
 
 #how to identify which burst are claps?
 #calculate SD with a sliding window - the lowest = 2 bursts small interburst interval
@@ -56,17 +49,41 @@ sd= SlidingWindow("sd",bursts$interburstInt , 2, 1)
 sd = c(sd,rep(NA,2))
 bursts$sd = sd
 
-#get the time of the claps
+#get the time of the first clap and show plot
 clap = which.min(bursts$sd)
+seg = segment(test, samplingRate = sampling,windowLength = 40, plot = T )
+check = as.numeric(readline("Which burst is the first clap? "))
+
+if (clap != check) {
+  clap = check
+}
+
+#get the time of the claps
 three_claps = data.frame(audioclap1 = bursts[clap, 1], audioclap2 = bursts[clap+1, 1], audioclap3 = bursts[clap+2, 1])
 three_claps = three_claps/1000
 ```
 
-This algorithm works well enough (0.8 accuracy). So now I'll wrap the code from the chunk above into a nice function. Also I'll build a sanity check into the function so that I can prevent any mistakes even before appearing in the final output.
-```{r audio algorithm function}
+This algorithm works well enough (0.8 accuracy). So now I'll wrap the code from the chunk above into a nice small functions. Also I'll build a sanity check into the function so that I can prevent any mistakes even before appearing in the final output. All functions are in R script "preprocessing_functions.R"
 
+Now loop through all audio files in the folder and gather the claps into one dataframe
+```{r}
+source("preprocessing_functions.R")
+
+audio_path = "raw_data/Audio"
+audio_files = load_folder(audio_path)
+#place to store all claps
+audio_claps = data.frame()
+
+for (file in audio_files) {
+  one_output = try(get_claps(file))
+  
+  #rbind the output to the big dataframe
+  audio_claps = try(rbind(audio_claps, one_output))
+}
+
+#save the output
+write.csv(audio_claps, "clean_data/audio_claps.csv")
 ```
-
 
 
 Find claps in the actigraphs

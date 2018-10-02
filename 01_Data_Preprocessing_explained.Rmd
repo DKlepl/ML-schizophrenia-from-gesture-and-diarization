@@ -18,39 +18,40 @@ pacman::p_load(tidyverse, hms, tuneR)
 #read audio file
 audio_path = "raw_data/Audio"
 audio_files = list.files(path=audio_path, full.names = T) 
-f = audio_files[1]
+f = audio_files[74]
 
 #subject ID
 filename = strsplit(f, '/')[[1]][3]
-id = strsplit(filename, '[.]')[[1]][1]
+ID = strsplit(filename, '[.]')[[1]][1]
+
 
 #save also diagnosis
-if (startsWith(id,"1")==T) {
+if (startsWith(ID,'1')==T) {
   diagnosis=1
 } else {
   diagnosis=0
-  }
+}
 
 audio = readWave(f)
 sampling = audio@samp.rate #22050
 
-test = audio@left[(0):(10*sampling)]
+test =as.numeric(audio@left[(0*sampling):(4*sampling)])
+rm(audio)
 
 #use soundgen's algorithm to find bursts of acoustic energy in the signal
 #it's intended for syllable segmentation but it works well
 library(soundgen)
-seg = segment(test, samplingRate = sampling,windowLength = 40, plot = T )
+seg = segment(test, samplingRate = sampling, plot = T )
 bursts = seg$bursts
 
 #how to identify which burst are claps?
 #calculate SD with a sliding window - the lowest = 2 bursts small interburst interval
 library(evobiR)
-sd= SlidingWindow("sd",bursts$interburstInt , 2, 1)
-sd = c(sd,rep(NA,2))
-bursts$sd = sd
+sd= SlidingWindow("sd",bursts$time , 3, 1)
+
 
 #get the time of the first clap and show plot
-clap = which.min(bursts$sd)
+clap = which.min(sd)
 seg = segment(test, samplingRate = sampling,windowLength = 40, plot = T )
 check = as.numeric(readline("Which burst is the first clap? "))
 
@@ -61,6 +62,7 @@ if (clap != check) {
 #get the time of the claps
 three_claps = data.frame(audioclap1 = bursts[clap, 1], audioclap2 = bursts[clap+1, 1], audioclap3 = bursts[clap+2, 1])
 three_claps = three_claps/1000
+three_claps = three_claps+342
 ```
 
 This algorithm works well enough (0.8 accuracy). So now I'll wrap the code from the chunk above into a nice small functions. Also I'll build a sanity check into the function so that I can prevent any mistakes even before appearing in the final output. All functions are in R script "preprocessing_functions.R"
@@ -172,22 +174,7 @@ if (continue==T) {
 }
 ```
 
-```{r}
-info = get_info(gesture_files[1], type="g")
-actigraph = read_actigraph(path=gesture_files[1])
-extracted = find_peaks(data=actigraph)
-continue = sanity_check_actigraph(peaks = extracted)
-one_file = get_output_actigraph(info, extracted, continue)
-
-#plot where eyeballing fails
-plot(actigraph$PsychologistJerkLeft, type="l", col="navy")
-x_left = as.data.frame(findpeaks(actigraph$PsychologistJerkLeft, minpeakheight = 2, npeaks = 100, minpeakdistance = 20))
-points(x_left[, 2], x_left[, 1],col="red", pch=20)
-
-ggplot(actigraph[1:nrow(actigraph),])+
-   geom_line(aes((1:nrow(actigraph) )/100,PsychologistJerkLeft),color="blue")
-```
-
+Now we can compare the difference of the extracted claps with the gap between manual notes about the start times.
 ```{r Timing_Handedness.txt}
 #strinAsFactors=F because time-data would get converted to factors
 Timing = read.delim("raw_data/Timing_Handedness.txt", na.strings="NaN", stringsAsFactors=F)
@@ -199,8 +186,6 @@ Timing = Timing %>% mutate(
   VoiceStart=as.hms(VoiceStart),
   Diff=VoiceStart-GestureStart
 )
-
-dia = read.csv("raw_data/Diarization/103.csv")
 ```
   
   

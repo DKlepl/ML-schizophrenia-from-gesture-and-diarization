@@ -174,18 +174,144 @@ if (continue==T) {
 }
 ```
 
-Now we can compare the difference of the extracted claps with the gap between manual notes about the start times.
+### CHECK
+Now we compare the difference of the extracted claps with the gap between manual notes about the start times.
 ```{r Timing_Handedness.txt}
 #strinAsFactors=F because time-data would get converted to factors
 Timing = read.delim("raw_data/Timing_Handedness.txt", na.strings="NaN", stringsAsFactors=F)
 
+#rename columns to the same names I used for audio and gesture claps files
+colnames(Timing)[1]="ID"
+
+#column 'Handedness in Timing denotes right dominance with 0 while my files use 1
+#switch the values
+Timing[Timing$Handedness==0, 'right']=1
+Timing[Timing$Handedness==1, 'right']=0
+
+#remove Handedness
+Timing = Timing[,c(-3,-7)]
+
 #all time-data needs to be converted to hms format from strings - I'll need to calculate with them
 #Diff is difference between VoiceStart and GestureStart in seconds
+
+library(hms)
 Timing = Timing %>% mutate(
   GestureStart=as.hms(GestureStart),
   VoiceStart=as.hms(VoiceStart),
   Diff=VoiceStart-GestureStart
 )
+
+#load audio and gesture claps
+a_claps = read.csv("clean_data/audio_claps.csv")
+g_claps = read.csv("clean_data/gesture_claps.csv")
+
+claps = merge(a_claps, g_claps, by=c("ID","diagnosis"))
+
+#calculate the gap between all three claps, than use average gap to compare with the hand-notes - round to 2 decimals because that's sampling of actigraphs
+claps$diff_1=round(abs(claps$audioclap1-claps$gestclap1),2)
+claps$diff_2=round(abs(claps$audioclap2-claps$gestclap2),2)
+claps$diff_3=round(abs(claps$audioclap3-claps$gestclap3),2)
+
+claps$Gap = apply(claps[,10:12],1,mean)
+claps$diff_sd = apply(claps[,10:12],1,sd)
+
+write.csv(claps , "clean_data/all_claps.csv", row.names = F)
+
+all = merge(Timing ,claps[,c(1,13)], by='ID')
+all$check_diff = abs(all$Diff-all$Gap)
+
+#look at difference between manual notes and automated gap calculation
+mean(all$check_diff, na.rm = T)
+sd(all$check_diff, na.rm = T)
+range(all$check_diff, na.rm = T)
 ```
+
+# Merging data
+Now we can merge gesture files with diarization files. In other words tagging all datapoints from actigraph by the interlocutor speaking in given timepoint.
+
+First we build a pipeline with just one subject. Then we convert the code into a real pipeline of functions inside of the 'preprocessing.R' script.
+```{r}
+#load all files from one participant - Sub105
+f_gest = 'raw_data/Gesture/Sub105RightHanded.csv'
+f_dia = 'raw_data/Diarization/105.csv'
+claps = read.csv("clean_data/all_claps.csv")
+gesture = read.csv(f_gest)
+turns = read.csv(f_dia)
+
+#remove first row which is just NA
+gesture = gesture[-1,]
+
+#sampling of the gesture data is 100 Hz
+sampling_gesture = 100
+
+#get ID of the participant
+ID = parse_number(f_gest)
+
+#get row from claps data with info about the gap
+gap = claps[claps$ID==ID,]
+
+#inspect the confidence of the diarization system
+sum((turns$Confidence<0.5)==T)
+mean(turns$Confidence)
+median(turns$Confidence)
+sd(turns$Confidence)
+
+#trim the gesture data to align it in time with the audio file - remove all rows before the first clap
+  #calculate the datapoint/row where the clap happened
+trim_gesture = gap$gestclap1 * sampling_gesture
+
+#cutoff all rows below the trim_gesture value
+gesture_aligned = gesture[trim_gesture:nrow(gesture),]
+
+#trim the diarization data - throw away anything that happened before the first clap because there are no gesture data
+trim_diarization = gap$audioclap1
+turns_aligned = turns[turns$StartTime>trim_diarization,]
+
+#create time variable in gesture_aligned in seconds+2decimals so that we don't have to convert time into sampling all the time
+gesture_aligned$time =1:nrow(gesture_aligned)/100
+
+#trim gesture data again - cut off the end based on last datapoint in diarization
+trim_end = max(turns_aligned$EndTime)
+gesture_final = gesture_aligned[gesture_aligned$time<=trim_end,]
+
+#create interviewer variable - binary variable with 0=subject speaking 1=interviewer speaking and -1=nobody speaking
+gesture_final$interviewer = -1
+
+  #iterate over entries in turns_aligned and fill the interviewer variable with correct values
+n=1
+for (entry in 1:nrow(turns_aligned)) {
+  row = turns_aligned[entry,]
   
+  #utterance start
+  start = row$StartTime
+  
+  #utterance end
+  end = row$EndTime
+  
+  #who's speaking in this time
+  speaker = row$Interlocutor
+  
+  #binarize the speaker => 1/0
+  speaker = ifelse(speaker=='Interviewer', yes=1, no=0)
+  
+  #fill the interviewer variable
+  
+  #for some reason this approach skips values
+  #utterance = seq(from=start, to=end, by=0.01)
+  #gesture_final[gesture_final$time %in% s, 'interviewer'] = speaker
+  
+  gesture_final[(start*100):(end*100), 'interviewer'] = speaker
+}
+
+#and remove silence because it doesn't have any useful information
+gesture_final = gesture_final[gesture_final$interviewer!=-1,]
+
+print(paste("Data from participant number", ID, "is clean.", sep = " "))
+
+if (n%%5 == 0) {
+  print(paste(n, "out of 86 processed."))
+}
+
+```
+
   

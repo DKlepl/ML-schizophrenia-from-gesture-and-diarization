@@ -1,4 +1,6 @@
-#read audio files in the folder
+#PREPROCESSING FUNCTIONS
+
+# FUNCTIONS FOR LOADING DATA AND EXTRACTING INFO FROM FILENAMES
 load_folder = function(path) {
   path = path
   all_files = list.files(path=path, full.names = T) 
@@ -36,6 +38,13 @@ read_audio = function(f) {
   return(test)
 }
 
+read_actigraph = function(path) {
+  data = read.csv(path)
+  data = na.omit(data)
+  return(data)
+}
+
+# FUNCTIONS FOR DETECTING CLAPS IN AUDIO
 segment_audio = function(sound) {
   
   #use soundgen's algorithm to find bursts of acoustic energy in the signal
@@ -121,12 +130,7 @@ get_claps_audio = function(f) {
   return(one_file)
 }
 
-read_actigraph = function(path) {
-  data = read.csv(path)
-  data = na.omit(data)
-  return(data)
-}
-
+# FUNCTIONS FOR DETECTING CLAPS IN ACTIGRAPH SIGNAL
 find_peaks = function(data) {
   x_left = as.data.frame(pracma::findpeaks(data$PsychologistJerkLeft, minpeakheight = 2, npeaks = 100, minpeakdistance = 20))
   x_right = as.data.frame(pracma::findpeaks(data$PsychologistJerkRight, minpeakheight = 2, npeaks = 100, minpeakdistance = 20))
@@ -176,6 +180,7 @@ get_claps_actigraph = function(f) {
   return(one_file)
 }
 
+# PIPELINE FOR DETECTING CLAPS IN AUDIO AND ACTIGRAPH
 get_claps_folder = function (folder_path, type=c("audio", "actigraph")) {
   files = load_folder(folder_path)
   #place to store all claps
@@ -203,3 +208,89 @@ get_claps_folder = function (folder_path, type=c("audio", "actigraph")) {
     write.csv(claps, "clean_data/gesture_claps.csv")
   }
 }
+
+# FUNCTIONS FOR ALIGNMENT AND MERGING OF DATA
+
+#construct the correct name of the respective diarization file and load it
+get_right_diarization = function(ID) {
+  diarization_path = paste0("raw_data/Diarization/", ID, ".csv")
+  diarization_data = read.csv(diarization_path)
+  
+  return(diarization_data)
+}
+
+align_gesture = function(gesture_data, diarization_data ,claps_entry) {
+  sampling = 100
+  trim_start = claps_entry$gestclap1 * sampling
+  gesture_aligned = gesture_data[trim_start:nrow(gesture_data),]
+  gesture_aligned$time =1:nrow(gesture_aligned)/sampling
+  trim_end = max(diarization_data$EndTime)
+  gesture_final = gesture_aligned[gesture_aligned$time<=trim_end,]
+  gesture_final$interviewer = -1
+  gesture_final$utterance_n = 0
+  
+  return(gesture_final)
+}
+
+align_diarization = function(diarization_data, claps_entry) {
+  trim = claps_entry$audioclap1
+  diarization_aligned = diarization_data[diarization_data$StartTime>trim,]
+  
+  return(diarization_aligned)
+}
+
+merge = function(gesture, diarization) {
+  utterance_number=1
+  for (entry in 1:nrow(diarization)) {
+    row = diarization[entry,]
+    start = row$StartTime
+    end = row$EndTime
+    speaker = row$Interlocutor
+    speaker = ifelse(speaker=='Interviewer', yes=1, no=0)
+    gesture[(start*100):(end*100), 'interviewer'] = speaker
+    gesture[(start*100):(end*100), 'utterance_n'] = utterance_number
+    utterance_number = utterance_number+1
+  }
+  
+  return(gesture)
+}
+
+tag_one = function(f, claps) {
+  info = try(get_info(f, "g"))
+  gesture_data = try(read_actigraph(f))
+  diarization_data = try(get_right_diarization(info$ID))
+  
+  #get the entry in claps
+  gap = try(claps[claps$ID==info$ID,])
+  
+  diarization_data = try(align_diarization(diarization_data, gap))
+  gesture_data = try(align_gesture(gesture_data, diarization_data , gap))
+  
+  gesture_clean = try(merge(gesture_data, diarization_data))
+  
+  #save all files
+  diarization_name = try(paste0("clean_data/Diarization/", info$ID, "_clean.csv"))
+  gesture_name = try(paste0("clean_data/Gesture/", info$ID, "_", info$right, "_tagged.csv" ))
+  
+  try(write.csv(diarization_data, diarization_name))
+  try(write.csv(gesture_clean, gesture_name))
+}
+
+tag_all = function() {
+  gesture_files = load_folder("raw_data/Gesture")
+  claps = read.csv("clean_data/all_claps.csv")
+  
+  n = 1
+  for (i in 1:length(gesture_files)) {
+    file = gesture_files[i]
+    try(tag_one(file, claps))
+    print(n)
+    if (n%%5 == 0) {
+      print(paste(n, "out of 86 processed."))
+    }
+    n=n+1
+  }
+}
+
+file = gesture_files[3]
+tag_one(file, claps)

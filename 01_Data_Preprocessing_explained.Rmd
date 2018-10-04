@@ -208,9 +208,9 @@ g_claps = read.csv("clean_data/gesture_claps.csv")
 claps = merge(a_claps, g_claps, by=c("ID","diagnosis"))
 
 #calculate the gap between all three claps, than use average gap to compare with the hand-notes - round to 2 decimals because that's sampling of actigraphs
-claps$diff_1=round(abs(claps$audioclap1-claps$gestclap1),2)
-claps$diff_2=round(abs(claps$audioclap2-claps$gestclap2),2)
-claps$diff_3=round(abs(claps$audioclap3-claps$gestclap3),2)
+claps$diff_1=round(claps$audioclap1-claps$gestclap1,2)
+claps$diff_2=round(claps$audioclap2-claps$gestclap2,2)
+claps$diff_3=round(claps$audioclap3-claps$gestclap3,2)
 
 claps$Gap = apply(claps[,10:12],1,mean)
 claps$diff_sd = apply(claps[,10:12],1,sd)
@@ -303,8 +303,6 @@ for (entry in 1:nrow(turns_aligned)) {
   gesture_final[(start*100):(end*100), 'interviewer'] = speaker
 }
 
-#and remove silence because it doesn't have any useful information
-gesture_final = gesture_final[gesture_final$interviewer!=-1,]
 
 print(paste("Data from participant number", ID, "is clean.", sep = " "))
 

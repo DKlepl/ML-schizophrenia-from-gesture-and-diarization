@@ -312,4 +312,22 @@ if (n%%5 == 0) {
 
 ```
 
+## Final clean-up
+Remove files that we don't have actigraphs from.
+```{r}
+clean_act = parse_number(list.files("clean_data/Gesture"))
+clean_dia = parse_number(list.files("clean_data/Diarization"))
+
+length(clean_act) - length(clean_dia) #in dia should be more files
+
+not_exist = clean_dia[(clean_dia %in% clean_act) ==F]
+
+for (i in not_exist) {
+  delete = paste0("clean_data/Diarization/", i, "_clean.csv")
+  print(paste0("Deleting subject ",i))
+  unlink(delete)
+}
+```
+
+
   

@@ -1,0 +1,10 @@
+---
+title: "Feature Engineering"
+author: "Dominik Klepl"
+date: "10/15/2018"
+output: html_document
+---
+
+After the preprocessing phase the data is clean, actigraph data is tagged by speaker. Before the features can be extracted data from every participant will be split into small snippets and in 2 categories: single signal and synergy.
+In single signal the snippet is 1 utterance long.
+In synergy the snippet is 1 utterance-exchange long (1st speaker followed by 2nd speaker).

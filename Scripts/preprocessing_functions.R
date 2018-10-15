@@ -269,7 +269,7 @@ tag_one = function(f, claps) {
   gesture_clean = try(merge(gesture_data, diarization_data))
   
   #save all files
-  diarization_name = try(paste0("clean_data/Diarization/", info$ID, "_clean.csv"))
+  diarization_name = try(paste0("clean_data/Diarization/", info$ID, "_", info$right, "_tagged.csv"))
   gesture_name = try(paste0("clean_data/Gesture/", info$ID, "_", info$right, "_tagged.csv" ))
   
   try(write.csv(diarization_data, diarization_name))
@@ -292,5 +292,19 @@ tag_all = function() {
   }
 }
 
-file = gesture_files[3]
-tag_one(file, claps)
+#delete files that don't have both actigraph and diarization data
+delete_files = function () {
+  clean_act = parse_number(list.files("clean_data/Gesture"))
+  clean_dia = parse_number(list.files("clean_data/Diarization"))
+  
+  length(clean_act) - length(clean_dia) #in dia should be more files
+  
+  not_exist = clean_dia[(clean_dia %in% clean_act) ==F]
+  
+  for (i in not_exist) {
+    delete = paste0("clean_data/Diarization/", i, "_clean.csv")
+    print(paste0("Deleting subject ",i))
+    unlink(delete)
+  }
+  print("Preprocessing was finished.")
+}

@@ -48,5 +48,9 @@ split_single_all = function() {
   for (f in 1:length(all_gest)) {
     file = all_gest[f]
     try(split_single(file))
+    
+    if (f%%5 == 0) {
+      print(paste(f, "out of 81 processed."))
+    }
   }
 }

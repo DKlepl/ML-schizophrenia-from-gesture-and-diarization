@@ -13,8 +13,95 @@ First I write code and functions to split the data correctly on one sample file.
 
 Load sample - both diarization and actigraph data
 ```{r}
-gest = read.csv("clean_data/Gesture/103_1_tagged.csv")
+all_gest = list.files("clean_data/Gesture")
+
+gest = read.csv("clean_data/Gesture/142_0_tagged.csv")
+diar = read.csv("clean_data/Diarization/142_0_tagged.csv")
+
+#number utterances
+diar$utterance_n = seq(1, nrow(diar))
+
+#recalculate the duration, it seems there are errors
+diar$dur = diar$EndTime-diar$StartTime
+sum((diar$Duration==diar$dur)==T)
+
+#either the StartTime and EndTime are wrong or the duration is calculated incorrectly
+diar$Duration = diar$dur
 ```
 
-
 ## 1. Single signal splitting
+
+First we clean the actigraph data - remove silence
+```{r}
+all_gest = list.files("clean_data/Gesture", full.names = T)
+actigraph = all_gest[54]
+
+load_actigraph = function(file) {
+  data = read.csv(file)
+  data = data[,-1]
+  
+  #remove silence
+  data = subset(data, interviewer !=-1)
+  
+  return(data)
+}
+
+d = load_actigraph(actigraph)
+```
+
+Now it must be decided which utterances should be used, what's the minimal lenght
+```{r}
+
+#look at one utterance
+t = subset(gest, utterance_n==88)
+
+plot(t$ParticipantJerkRight, type='l')
+plot(t$PsychologistJerkRight, type='l')
+
+#inspect some desc statitistics and plots
+library(pastecs)
+round(stat.desc(diar$Duration),2)
+
+hist(diar$Duration)
+sum(diar$Duration>0.5)
+```
+
+Get info out of the name of the file.
+```{r}
+get_info = function(file) {
+  filename = strsplit(file, "/")[[1]][3]
+  split = strsplit(filename, "_")[[1]]
+  info = data.frame(ID = split[1],
+                    right = split[2])
+  
+  return(info)
+}
+```
+
+Split the file into utterance-long mini files and save them in a separate folders. Also the utterances need to be categorized in 2 folders, by interlocutor.
+
+```{r}
+inf=get_info(actigraph)
+
+split_save_single = function (data, info) {
+  for (n in unique(data$utterance_n)) {
+    actigraph_subset = subset(data, utterance_n==n)
+    
+    #construct name of the file to save
+    duration = nrow(actigraph_subset)
+    name = paste(info$ID, info$right, n , duration, sep="_")
+    
+    save_path = "trash/"
+    try(if (actigraph_subset$interviewer[1]==0) {
+      save_path = "clean_data/Split_data/Single/Participant/"
+    } else save_path = "clean_data/Split_data/Single/Interviewer/")
+    
+    save_as = paste0(save_path, name, ".csv")
+    
+    write.csv(actigraph_subset, save_as, row.names = F)
+  }
+}
+
+split_save_single(data=d,info=inf)
+```
+

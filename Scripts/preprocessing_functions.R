@@ -284,7 +284,6 @@ tag_all = function() {
   for (i in 1:length(gesture_files)) {
     file = gesture_files[i]
     try(tag_one(file, claps))
-    print(n)
     if (n%%5 == 0) {
       print(paste(n, "out of 86 processed."))
     }

@@ -23,8 +23,7 @@ split_save_single = function (data, info) {
     actigraph_subset = subset(data, utterance_n==n)
     
     #construct name of the file to save
-    duration = nrow(actigraph_subset)
-    name = paste(info$ID, info$right, n , duration, sep="_")
+    name = paste(info$ID, n, info$right, sep="_")
     
     save_path = "trash/"
     try(if (actigraph_subset$interviewer[1]==0) {
@@ -33,7 +32,7 @@ split_save_single = function (data, info) {
     
     save_as = paste0(save_path, name, ".csv")
     
-    write.csv(actigraph_subset, save_as)
+    write.csv(actigraph_subset, save_as, row.names = F)
   }
 }
 
@@ -54,3 +53,70 @@ split_single_all = function() {
     }
   }
 }
+
+#Coordination splitting - 2 utterances long
+make_pairs = function(data, info) {
+  #number the utterances (should correspond to utterance_n in actigraph)
+  data$utterance_n = seq(1, nrow(data))
+  
+  #split by interlocutor
+  diar_i = subset(data, Interlocutor=="Interviewer")
+  diar_p = subset(data, Interlocutor == "Participant")
+  
+  #dataframe to store the pairs in
+  pairs = data.frame(ID = numeric(),
+                     utterance_1 = numeric(),
+                     utterance_2 = numeric(),
+                     latency = numeric())
+  
+  #search for closest utterance in time - pick one utterance in diar_i and compare it to all in diar_p
+  for (n in 1:nrow(diar_i)) {
+    one_utterance = diar_i[n,]
+    
+    #sometimes there might be 2 utterances to pair with, before and after the given utterance
+    end_start_diff = abs(diar_p$StartTime-one_utterance$EndTime)
+    following_utterance = diar_p[which.min(end_start_diff),]
+    
+    #append the pair to the pairs dataframe
+    f_pair = data.frame(ID=info$ID,
+                        utterance_1 = one_utterance$utterance_n,
+                        utterance_2 = following_utterance$utterance_n,
+                        latency = end_start_diff[which.min(end_start_diff)])
+    pairs = rbind(pairs, f_pair)
+    
+    start_end_diff = abs(one_utterance$StartTime-diar_p$EndTime)
+    previous_utterance = diar_p[which.min(start_end_diff),]
+    
+    #append the pair to the dataframe
+    p_pair = data.frame(ID=info$ID,
+                        utterance_1 = one_utterance$utterance_n,
+                        utterance_2 = previous_utterance$utterance_n,
+                        latency = start_end_diff[which.min(start_end_diff)])
+    pairs = rbind(pairs, p_pair)
+  }
+  return(pairs)
+}
+
+coordination_split = function(filename) {
+  inf = get_info(filename)
+  diarization = read.csv(filename)
+  diarization$utterance_n = seq(1, nrow(diarization))
+  pairs = try(make_pairs(data = diarization, info = inf))
+  
+  return(pairs)
+}
+
+coordination_split_all = function() {
+  all_diar = list.files("clean_data/Diarization", full.names = T)
+  all_pairs = data.frame(ID = numeric(),
+                         utterance_1 = numeric(),
+                         utterance_2 = numeric(),
+                         latency = numeric())
+  for (i in 1:length(all_diar)) {
+    file = all_diar[i]
+    pairs = try(coordination_split(filename = file))
+    all_pairs = try(rbind(all_pairs, pairs))
+  }
+  write.csv(all_pairs, "clean_data/Split_data/coordination_pairs.csv", row.names = F)
+}
+

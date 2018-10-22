@@ -169,15 +169,23 @@ coordination_pairs = na.omit(coordination_pairs)
 #inspect the latency
 range(coordination_pairs$latency)
 hist(coordination_pairs$latency)
+cutoff = mean(coordination_pairs$latency)+(3*(sd(coordination_pairs$latency)))
+coordination_pairs = subset(coordination_pairs, latency<cutoff)
+mean(coordination_pairs$latency)
 
 coordination_pairs = tidyr::unite(coordination_pairs, pair, c(ID,utterance_1, utterance_2), remove=F)
 
 #keep only unique pairs
-unique_pairs = unique(coordination_pairs$pair)
+unique_pairs = as.data.frame(unique(coordination_pairs$pair))
 
+#unwrap the pairs again
+coordination_pairs = separate(data=unique_pairs, col="unique(coordination_pairs$pair)",into=c('ID', 'u_1', 'u_2'), sep="_")
+
+#save the final pairs
+write.csv(coordination_pairs, "clean_data/Split_data/coordination_pairs.csv", row.names = F)
 ```
 
-cbind.na function
+The cbind.na function for merging vectors of unequal lenght.
 ```{r}
 cbind.na <- function (..., deparse.level = 1) 
 {
@@ -274,7 +282,5 @@ cbind.na <- function (..., deparse.level = 1)
     }
     r
 }
-
-
 ```
 

@@ -1,10 +1,7 @@
-#Single signal data split - 1 utterance long
-load_actigraph = function(file) {
-  data = read.csv(file)
+#Single signal data splitting - 10 seconds long
+read_actigraph = function(filename) {
+  data = read.csv(filename)
   data = data[,-1]
-  
-  #remove silence
-  data = subset(data, interviewer !=-1)
   
   return(data)
 }
@@ -18,105 +15,59 @@ get_info = function(file) {
   return(info)
 }
 
-split_save_single = function (data, info) {
-  for (n in unique(data$utterance_n)) {
-    actigraph_subset = subset(data, utterance_n==n)
-    
-    #construct name of the file to save
-    name = paste(info$ID, n, info$right, sep="_")
-    
-    save_path = "trash/"
-    try(if (actigraph_subset$interviewer[1]==0) {
-      save_path = "clean_data/Split_data/Single/Participant/"
-    } else save_path = "clean_data/Split_data/Single/Interviewer/")
-    
-    save_as = paste0(save_path, name, ".csv")
-    
-    write.csv(actigraph_subset, save_as, row.names = F)
+split_by_interlocutor = function (data, info, interlocutor = c("I", "P"), sampling=100, split_lenght=10) {
+  if (interlocutor=="I") {
+    i=1
+    save_path = "clean_data/Split_data/Interviewer/"
+  } else {
+    i=0
+    save_path = "clean_data/Split_data/Participant/"
   }
-}
-
-split_single = function(file) {
-  data = try(load_actigraph(file))
-  info = try(get_info(file))
-  try(split_save_single(data=data, info=info))
-}
-
-split_single_all = function() {
-  all_gest = list.files("clean_data/Gesture", full.names = T)
-  for (f in 1:length(all_gest)) {
-    file = all_gest[f]
-    try(split_single(file))
+  
+  data_subset = subset(data, interviewer==i)
+  rownames(data_subset)=NULL
+  full_lenght = nrow(data_subset)
+  
+  split = sampling*split_lenght
+  n_splits = trunc((nrow(data_subset)/split),0)
+  
+  data_subset = data_subset[1:(n_splits*split),]
+  loss = (full_lenght-(nrow(data_subset)))/sampling
+  
+  data_subset$split = rep(1:n_splits,each=split)
+  splitted = split(data_subset, data_subset$split)
+  
+  for (d in 1:length(splitted)) {
+    dataframe = splitted[[d]]
+    filename = paste(info$ID, info$right, d, ".csv", sep = "_")
+    save_as = paste0(save_path, filename)
     
-    if (f%%5 == 0) {
-      print(paste(f, "out of 81 processed."))
+    write.csv(dataframe, save_as)
+  }
+  
+  return(loss)
+}
+
+split_actigraph = function(filename) {
+  actigraph = try(read_actigraph(filename))
+  file_info = try(get_info(filename))
+  loss_interviewer = try(split_by_interlocutor(data=actigraph, info = file_info, interlocutor = "I"))
+  loss_participant = try(split_by_interlocutor(data=actigraph, info = file_info, interlocutor = "P"))
+  
+  loss = try(as.data.frame(cbind(loss_interviewer, loss_participant)))
+  
+  return(loss)
+}
+
+split_all = function(folder="clean_data/Gesture") {
+  all_files = list.files(folder, full.names = T)
+  all_losses = data.frame()
+  for (i in 1:length(all_files)) {
+    file = all_files[i]
+    loss = try(split_actigraph(file))
+    all_losses = try(rbind(all_losses, loss))
     }
-  }
-}
-
-#Coordination splitting - 2 utterances long
-make_pairs = function(data, info) {
-  #number the utterances (should correspond to utterance_n in actigraph)
-  data$utterance_n = seq(1, nrow(data))
+  try(write.csv(all_losses, "clean_data/Split_data/data_loss_single.csv"))
   
-  #split by interlocutor
-  diar_i = subset(data, Interlocutor=="Interviewer")
-  diar_p = subset(data, Interlocutor == "Participant")
-  
-  #dataframe to store the pairs in
-  pairs = data.frame(ID = numeric(),
-                     utterance_1 = numeric(),
-                     utterance_2 = numeric(),
-                     latency = numeric())
-  
-  #search for closest utterance in time - pick one utterance in diar_i and compare it to all in diar_p
-  for (n in 1:nrow(diar_i)) {
-    one_utterance = diar_i[n,]
-    
-    #sometimes there might be 2 utterances to pair with, before and after the given utterance
-    end_start_diff = abs(diar_p$StartTime-one_utterance$EndTime)
-    following_utterance = diar_p[which.min(end_start_diff),]
-    
-    #append the pair to the pairs dataframe
-    f_pair = data.frame(ID=info$ID,
-                        utterance_1 = one_utterance$utterance_n,
-                        utterance_2 = following_utterance$utterance_n,
-                        latency = end_start_diff[which.min(end_start_diff)])
-    pairs = rbind(pairs, f_pair)
-    
-    start_end_diff = abs(one_utterance$StartTime-diar_p$EndTime)
-    previous_utterance = diar_p[which.min(start_end_diff),]
-    
-    #append the pair to the dataframe
-    p_pair = data.frame(ID=info$ID,
-                        utterance_1 = one_utterance$utterance_n,
-                        utterance_2 = previous_utterance$utterance_n,
-                        latency = start_end_diff[which.min(start_end_diff)])
-    pairs = rbind(pairs, p_pair)
-  }
-  return(pairs)
+  return(all_losses)
 }
-
-coordination_split = function(filename) {
-  inf = get_info(filename)
-  diarization = read.csv(filename)
-  diarization$utterance_n = seq(1, nrow(diarization))
-  pairs = try(make_pairs(data = diarization, info = inf))
-  
-  return(pairs)
-}
-
-coordination_split_all = function() {
-  all_diar = list.files("clean_data/Diarization", full.names = T)
-  all_pairs = data.frame(ID = numeric(),
-                         utterance_1 = numeric(),
-                         utterance_2 = numeric(),
-                         latency = numeric())
-  for (i in 1:length(all_diar)) {
-    file = all_diar[i]
-    pairs = try(coordination_split(filename = file))
-    all_pairs = try(rbind(all_pairs, pairs))
-  }
-  write.csv(all_pairs, "clean_data/Split_data/coordination_pairs.csv", row.names = F)
-}
-

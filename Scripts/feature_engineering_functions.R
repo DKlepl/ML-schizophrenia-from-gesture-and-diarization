@@ -18,13 +18,16 @@ get_info = function(file) {
 split_by_interlocutor = function (data, info, interlocutor = c("I", "P"), sampling=100, split_lenght=10) {
   if (interlocutor=="I") {
     i=1
+    remove_columns = c(-3, -4)
     save_path = "clean_data/Split_data/Interviewer/"
   } else {
     i=0
+    remove_columns = c(-1, -2)
     save_path = "clean_data/Split_data/Participant/"
   }
   
   data_subset = subset(data, interviewer==i)
+  data_subset = data_subset[,remove_columns]
   rownames(data_subset)=NULL
   full_lenght = nrow(data_subset)
   
@@ -42,7 +45,7 @@ split_by_interlocutor = function (data, info, interlocutor = c("I", "P"), sampli
     filename = paste(info$ID, info$right, d, ".csv", sep = "_")
     save_as = paste0(save_path, filename)
     
-    write.csv(dataframe, save_as)
+    write.csv(dataframe, save_as, row.names = F)
   }
   
   return(loss)
@@ -67,7 +70,7 @@ split_all = function(folder="clean_data/Gesture") {
     loss = try(split_actigraph(file))
     all_losses = try(rbind(all_losses, loss))
     }
-  try(write.csv(all_losses, "clean_data/Split_data/data_loss_single.csv"))
+  try(write.csv(all_losses, "clean_data/Split_data/data_loss_single.csv", row.names = F))
   
   return(all_losses)
 }

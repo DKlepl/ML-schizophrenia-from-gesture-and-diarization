@@ -115,3 +115,60 @@ remove_no_match = function(){
   }
 }
 
+merge_signals = function(filename) {
+  #folders where all data splits are
+  interviewer_folder = "clean_data/Split_data/Coordination/Interviewer_copy/"
+  participant_folder = "clean_data/Split_data/Coordination/Participant_copy/"
+  
+  #construct the name of the 2 data splits
+  interviewer_file = paste0(interviewer_folder, filename)
+  participant_file = paste0(participant_folder, filename)
+  
+  data_interviewer = read.csv(interviewer_file)
+  data_participant = read.csv(participant_file)
+  
+  #remove and rename columns to have unique column names in both dataframes
+  data_interviewer = data_interviewer[,c(-4, -6)]
+  colnames(data_interviewer) = c("PsychologistJerkLeft", "PsychologistJerkRight", "time_int", "utterance_n_int")
+  
+  data_participant = data_participant[,c(-4,-6)]
+  colnames(data_participant) = c("ParticipanttJerkLeft", "ParticipantJerkRight", "time_par", "utterance_n_par")
+  
+  coordination_pair = cbind(data_interviewer, data_participant)
+  
+  #order the columns nicer
+  coordination_pair = coordination_pair[,c(1,2,5,6,3,7,4,8), drop=F]
+  
+  #is the participant right- or left-handed?
+  right = as.numeric(strsplit(filename,"_")[[1]][2])
+  
+  #keep only signal from the dominant hand of participant, unless that signal includes more than 200 zeroes, then keep the other hand signal
+  if (right==1) {
+    if (sum(coordination_pair$ParticipantJerkRight==0)<200) {
+      coordination_pair = coordination_pair[,-3]
+    } else coordination_pair = coordination_pair[,-4]
+  } else {
+    if (sum(coordination_pair$ParticipanttJerkLeft==0)<200) {
+      coordination_pair = coordination_pair[,-4]
+    } else coordination_pair = coordination_pair[,-3]
+  }
+  
+  #keep only the signal from dominant hand of the psychologist (which is always right) unless the signal contains more than 200 zeroes, then keep the other hand signal
+  if (sum(coordination_pair$PsychologistJerkRight==0)<200) {
+    coordination_pair = coordination_pair[,-1]
+  } else coordination_pair = coordination_pair[,-2]
+  
+  #save the resulting file
+  save_file = paste0("clean_data/Split_data/Coordination/", filename)
+  write.csv(coordination_pair, save_file, row.names = F)
+}
+
+create_coordination_pairs = function() {
+  all_filenames = list.files("clean_data/Split_data/Coordination/Interviewer_copy")
+  
+  for (f in all_filenames) {
+    try(merge_signals(filename = f))
+  }
+  
+  print("Done.")
+}

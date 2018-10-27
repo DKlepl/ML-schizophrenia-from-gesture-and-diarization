@@ -74,3 +74,44 @@ split_all = function(folder="clean_data/Gesture") {
   
   return(all_losses)
 }
+
+#Coordination pairs
+remove_no_match = function(){
+  #copy contents of 'Interviewer' folder into 'Coordination/Interviewer_copy'
+  original_interviewer = "clean_data/Split_data/Interviewer"
+  copy_interviewer = "clean_data/Split_data/Coordination/Interviewer_copy"
+  i_files = list.files(original_interviewer, full.names = T)
+  i_copy_success = file.copy(i_files, copy_interviewer)
+  sum(i_copy_success==F)
+  
+  #copy contents of 'Participant' folder into 'Coordination/Participant_copy'
+  original_participant = "clean_data/Split_data/Participant"
+  copy_participant = "clean_data/Split_data/Coordination/Participant_copy"
+  p_files = list.files(original_participant, full.names = T)
+  p_copy_success = file.copy(p_files, copy_participant)
+  sum(p_copy_success==F)
+  
+  #load all files from the 'Interviewer' and 'Participant' folders inside of Coordination folder
+  interviewer_files = list.files("clean_data/Split_data/Coordination/Interviewer_copy")
+  participant_files = list.files("clean_data/Split_data/Coordination/Participant_copy")
+  
+  no_match_i = interviewer_files[(interviewer_files %in% participant_files) ==F]
+  no_match_p = participant_files[(participant_files %in% interviewer_files) ==F]
+  
+  #sanity check
+  length(interviewer_files)-length(no_match_i) == length(participant_files)-length(no_match_p)
+  
+  #delete files from both directories
+  for (i in no_match_i) {
+    folder = "clean_data/Split_data/Coordination/Interviewer_copy/"
+    to_remove = paste0(folder, i)
+    try(file.remove(to_remove, recursive = T, force = T),silent = T)
+  }
+  
+  for (i in no_match_p) {
+    folder = "clean_data/Split_data/Coordination/Participant_copy/"
+    to_remove = paste0(folder, i)
+    try(file.remove(to_remove, recursive = T, force = T), silent = T)
+  }
+}
+

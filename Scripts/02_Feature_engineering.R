@@ -10,3 +10,6 @@ remove_no_match()
 
 #create the coordination pairs
 create_coordination_pairs()
+
+#run parameter optimization
+run_optimization(folder = "clean_data/Split_data/Coordination")

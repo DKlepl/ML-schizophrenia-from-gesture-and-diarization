@@ -8,6 +8,7 @@ output: html_document
 After the preprocessing phase the data is clean, actigraph data is tagged by speaker. Before the features can be extracted data from every participant will be split into small snippets and in 2 categories: single signal and synergy. 
 All snippets will be 10 seconds long. First I split all actigraph timeseries into smaller files which will have only signal of the speaker in given 10 seconds.
 Then these single speaker signals will be combined into consequtive pairs of signals for synergy analysis.
+Finally extract features from all the splitted signals: statistical and RQA.
 
 # 1. Single signal splitting
 
@@ -179,5 +180,127 @@ if (sum(coordination_pair$PsychologistJerkRight==0)<200) {
 save_file = paste0("clean_data/Split_data/Coordination/", filename)
 write.csv(coordination_pair, save_file, row.names = F)
 ```
+
+# 3. Feature extraction
+
+Load a 2 samples: single signal and coordination pair
+```{r}
+sample_s = "clean_data/Split_data/Participant/101_1_10_.csv"
+sample_c = "clean_data/Split_data/Coordination/101_1_10_.csv"
+
+single = read.csv(sample_s)
+coordination = read.csv(sample_c)
+```
+
+## 3.1 Info about participant and given data split
+Works for both single signal and coordination file
+```{r}
+filename = strsplit(sample_s, "/")[[1]][4]
+split = strsplit(filename, "_")[[1]]
+ID = split[1]
+if ((substr(ID,1,1))==1){
+  diagnosis = 1
+} else diagnosis = 0
+info = data.frame(ID = ID,
+                  diagnosis = diagnosis,
+                  right = split[2],
+                  split_n = split[3])
+```
+
+Count how many utterances are included in the data split from both interlocutors and what's the mean, maximal and minimal duration of the utterances.
+```{r}
+#info about the utterances - from single
+library(tidyverse)
+duration = single %>% group_by(utterance_n) %>% summarise(duration = max(time)-min(time))
+utterance_stats = pastecs::stat.desc(duration$duration)
+utterances_features = data.frame(n_utterances = utterance_stats[1],
+                                 median_duration = utterance_stats[8],
+                                 mean_duration = utterance_stats[9],
+                                 min_duration = utterance_stats[4],
+                                 max_duration = utterance_stats[5],
+                                 range_duration = utterance_stats[6],
+                                 sd_duration = utterance_stats[13],
+                                 iqr_duration = IQR(duration$duration))
+
+#from coordination file
+duration_int = coordination %>% group_by(utterance_n_int) %>% summarise(duration = max(time_int)-min(time_int))
+duration_par = coordination %>% group_by(utterance_n_par) %>% summarise(duration = max(time_par)-min(time_par))
+
+colnames(duration_int)[1] = 'utterance_n'
+colnames(duration_par)[1] = 'utterance_n'
+
+duration = rbind(duration_int, duration_par)
+
+utterance_stats = pastecs::stat.desc(duration$duration)
+utterances_features = data.frame(n_utterances = utterance_stats[1],
+                                 median_duration = utterance_stats[8],
+                                 mean_duration = utterance_stats[9],
+                                 min_duration = utterance_stats[4],
+                                 max_duration = utterance_stats[5],
+                                 range_duration = utterance_stats[6],
+                                 sd_duration = utterance_stats[13],
+                                 iqr_duration = IQR(duration$duration))
+```
+
+
+## 3.2 Statistical features
+
+Data from the coordination file needs to be transformed first - merge the signals.
+```{r}
+combined_signal = c(coordination[,1], coordination[,2])
+```
+
+Now compute various descriptive statistics about the signal
+```{r}
+descriptive_features = as.data.frame(t(pastecs::stat.desc(signal)))
+
+#some of the metrics in stat.desc are not necessary
+descriptive_features = descriptive_features[,c(-1,-3,-10,-11,-14)]
+
+#I don't like the name std.dev - rename it to sd
+colnames(descriptive_features)[9] = "sd"
+
+#add IQR
+descriptive_features$iqr = IQR(signal, na.rm = T)
+
+#add all 4 quantiles
+descriptive_features = cbind(descriptive_features,as.data.frame(t(quantile(signal))))
+
+#add median absolute deviation
+descriptive_features$mad = mad(signal)
+```
+
+## 3.3 RQA
+
+### 3.3.1 Parameter optimization
+Loop through files to optimize the parameters.
+
+One set of parameters for single signal data and another for coordination pairs. Based on assumption that 2 different systems produced the signals.
+
+```{r}
+library(crqa)
+
+#initialize parameters
+initial_par = list(lgM =  20, steps = seq(1, 6, 1), 
+radiusspan = 200, radiussample = 10, 
+normalize = 1, rescale = 1, mindiagline = 2, 
+minvertline = 2, tw = 0, whiteline = FALSE, 
+recpt = FALSE, fnnpercent = 10, typeami = "mindip")
+
+optim_par = optimizeParam(ts1 = signal, ts2 = signal, par = initial_par, min.rec = 3.5, max.rec = 4.5)
+
+rqa = crqa(signal,signal, radius = optim_par$radius, embed = optim_par$emddim, delay = optim_par$delay, normalize = 1, rescale = 1, mindiagline = 2, minvertline = 2)
+```
+
+### 3.3.2 Common parameters selection
+It's automated in the script. We explore the parameter space here and try to come up with properly motivated selection process.
+```{r}
+par_par = read.csv("clean_data/Split_data/rqa_parameters_participant.csv")
+par_int = read.csv("clean_data/Split_data/rqa_parameters_interviewer.csv")
+par_cor = read.csv("clean_data/Split_data/rqa_parameters_coordination.csv")
+```
+
+
+
 
 

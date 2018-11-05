@@ -295,9 +295,44 @@ rqa = crqa(signal,signal, radius = optim_par$radius, embed = optim_par$emddim, d
 ### 3.3.2 Common parameters selection
 It's automated in the script. We explore the parameter space here and try to come up with properly motivated selection process.
 ```{r}
-par_par = read.csv("clean_data/Split_data/rqa_parameters_participant.csv")
-par_int = read.csv("clean_data/Split_data/rqa_parameters_interviewer.csv")
-par_cor = read.csv("clean_data/Split_data/rqa_parameters_coordination.csv")
+par_par = read.csv("clean_data/Split_data/parameters_participant.csv")
+par_int = read.csv("clean_data/Split_data/parameters_interviewer.csv")
+par_cor = read.csv("clean_data/Split_data/parameters_coordination.csv")
+
+#merge participant and interviewer
+par_single = rbind(par_par, par_int)
+
+par_single$radius = as.numeric(as.character(par_single$radius))
+par_single$emddim = as.numeric(as.character(par_single$emddim))
+par_single$delay = as.numeric(as.character(par_single$delay))
+
+par_cor$radius = as.numeric(as.character(par_cor$radius))
+par_cor$emddim = as.numeric(as.character(par_cor$emddim))
+par_cor$delay = as.numeric(as.character(par_cor$delay))
+
+par_single = na.omit(par_single)
+par_cor = na.omit(par_cor)
+
+hist(par_single$radius)
+hist(par_cor$radius)
+
+get_mode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+emddim_single = max(par_single$emddim)
+emddim_coor = max(par_cor$emddim)
+
+delay_single = max(par_single$delay)
+delay_coor = max(par_cor$delay)
+
+final_param_single = data.frame(emddim = max(par_single$emddim),
+                                delay = max(par_single$delay),
+                                radius = get_mode(par_single$radius))
+final_param_cor = data.frame(emddim = max(par_cor$emddim),
+                                delay = max(par_cor$delay),
+                                radius = get_mode(par_cor$radius))
 ```
 
 

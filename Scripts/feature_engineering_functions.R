@@ -273,40 +273,102 @@ optimize_par = function(ts1, ts2) {
 ##for single data - can use coordination pairs
 run_optimization = function(folder) {
   all_files = list.files(folder, full.names = T)
-  
-  parameters_participant = data.frame()
-  parameters_interviewer = data.frame()
-  parameters_coordination = data.frame()
+  n= 1
+
   for (file in all_files) {
     data = read.csv(file)
+    print(file)
     participant_param = try(optimize_par(ts1 = data[,2], ts2 = data[,2]))
     interviewer_param = try(optimize_par(ts1 = data[,1], ts2 = data[,1]))
     coordination_param = try(optimize_par(ts1 = data[,1], ts2 = data[,2]))
     
-    parameters_participant = rbind(parameters_participant, participant_param)
-    parameters_interviewer = rbind(parameters_interviewer, interviewer_param)
-    parameters_coordination = rbind(parameters_coordination, coordination_param)
+    name = paste0(n, ".csv")
+     
+    try(write.csv(participant_param, paste0("clean_data/Split_data/rqa_p/", name), row.names = F))
+    try(write.csv(interviewer_param, paste0("clean_data/Split_data/rqa_i/", name), row.names = F))
+    try(write.csv(coordination_param, paste0("clean_data/Split_data/rqa_c/", name), row.names = F))
+    
+    n = n+1
   }
+}
+
+merge_parameters = function(folder) {
+  all = list.files(folder, full.names = T)
+  all_parameters = data.frame()
   
-  write.csv(parameters_participant, "clean_data/Split_data/rqa_parameters_participant.csv", row.names = F)
-  write.csv(parameters_interviewer, "clean_data/Split_data/rqa_parameters_interviewer.csv", row.names = F)
-  write.csv(parameters_coordination, "clean_data/Split_data/rqa_parameters_coordination.csv", row.names = F)
+  for (file in all) {
+    one = try(read.table(file, header=T, sep = ","))
+    all_parameters = try(rbind(all_parameters, one))
+  }
+  return(all_parameters)
+}
+
+merge_parameters_all = function() {
+  parameters_c = merge_parameters(folder = "clean_data/Split_data/rqa_c/")
+  write.csv(parameters_c,"clean_data/Split_data/parameters_coordination.csv", row.names = F)
+  
+  parameters_p = merge_parameters(folder = "clean_data/Split_data/rqa_p/")
+  write.csv(parameters_p,"clean_data/Split_data/parameters_participant.csv", row.names = F)
+  
+  parameters_i = merge_parameters(folder = "clean_data/Split_data/rqa_i/")
+  write.csv(parameters_i,"clean_data/Split_data/parameters_interviewer.csv", row.names = F)
 }
 
 select_parameters = function() {
+  par_par = read.csv("clean_data/Split_data/parameters_participant.csv")
+  par_int = read.csv("clean_data/Split_data/parameters_interviewer.csv")
+  par_cor = read.csv("clean_data/Split_data/parameters_coordination.csv")
   
+  #merge participant and interviewer
+  par_single = rbind(par_par, par_int)
+  
+  par_single$radius = as.numeric(as.character(par_single$radius))
+  par_single$emddim = as.numeric(as.character(par_single$emddim))
+  par_single$delay = as.numeric(as.character(par_single$delay))
+  
+  par_cor$radius = as.numeric(as.character(par_cor$radius))
+  par_cor$emddim = as.numeric(as.character(par_cor$emddim))
+  par_cor$delay = as.numeric(as.character(par_cor$delay))
+  
+  par_single = na.omit(par_single)
+  par_cor = na.omit(par_cor)
+  
+  final_parameters = data.frame(emddim = c(median(par_single$emddim),median(par_cor$emddim)),
+                                delay = c(median(par_single$delay),median(par_cor$delay)),
+                                radius = c(median(par_single$radius),median(par_cor$radius)))
+  
+  rownames(final_parameters) = c("single", "coordination")
+  
+  write.csv(final_parameters,"clean_data/Split_data/final_parameters.csv")
 }
 
-compute_rqa = function(ts1, ts2, par) {
+compute_rqa = function(ts1, ts2, radius, emddim, delay) {
   result = crqa::crqa(ts1, ts2, 
-                      radius = par$radius, embed = par$emddim, delay = par$delay,
+                      radius = radius, embed = emddim, delay = delay,
                       normalize = 1, rescale = 1, mindiagline = 2, minvertline = 2)
   
   result = result[-10]
   return(result)
 }
 
-extract_rqa = function(data) {}
+extract_rqa = function(data, parameters) {
+  rqa_participant = as.data.frame(compute_rqa(data[,2], data[,2], 
+                                radius = parameters["single","radius"],
+                                emddim = parameters["single","emddim"],
+                                delay = parameters["single","delay"]))
+  rqa_interviewer = as.data.frame(compute_rqa(data[,1], data[,1], 
+                                radius = parameters["single","radius"],
+                                emddim = parameters["single","emddim"],
+                                delay = parameters["single","delay"]))
+  rqa_coordination = as.data.frame(compute_rqa(data[,1], data[,2], 
+                                radius = parameters["coordination","radius"],
+                                emddim = parameters["coordination","emddim"],
+                                delay = parameters["coordination","delay"]))
+  
+  output = list(rqa_participant, rqa_interviewer, rqa_coordination)
+  
+  return(output)
+}
 
 extract_features = function(file) {
   info = get_info2(file)

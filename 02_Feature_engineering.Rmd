@@ -321,18 +321,14 @@ get_mode <- function(v) {
    uniqv[which.max(tabulate(match(v, uniqv)))]
 }
 
-emddim_single = max(par_single$emddim)
-emddim_coor = max(par_cor$emddim)
+final_parameters = data.frame(emddim = c(max(par_single$emddim),max(par_cor$emddim)),
+                                delay = c(max(par_single$delay),max(par_cor$delay)),
+                                radius = c(get_mode(par_single$radius),get_mode(par_cor$radius)))
 
-delay_single = max(par_single$delay)
-delay_coor = max(par_cor$delay)
+rownames(final_parameters) = c("single", "coordination")
 
-final_param_single = data.frame(emddim = max(par_single$emddim),
-                                delay = max(par_single$delay),
-                                radius = get_mode(par_single$radius))
-final_param_cor = data.frame(emddim = max(par_cor$emddim),
-                                delay = max(par_cor$delay),
-                                radius = get_mode(par_cor$radius))
+
+parameters = read.csv("clean_data/Split_data/final_parameters.csv", row.names = 1)
 ```
 
 

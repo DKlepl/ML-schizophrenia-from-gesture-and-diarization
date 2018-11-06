@@ -352,11 +352,11 @@ compute_rqa = function(ts1, ts2, radius, emddim, delay) {
 }
 
 extract_rqa = function(data, parameters) {
-  rqa_participant = as.data.frame(compute_rqa(data[,2], data[,2], 
-                                radius = parameters["single","radius"],
-                                emddim = parameters["single","emddim"],
-                                delay = parameters["single","delay"]))
   rqa_interviewer = as.data.frame(compute_rqa(data[,1], data[,1], 
+                                              radius = parameters["single","radius"],
+                                              emddim = parameters["single","emddim"],
+                                              delay = parameters["single","delay"]))
+  rqa_participant = as.data.frame(compute_rqa(data[,2], data[,2], 
                                 radius = parameters["single","radius"],
                                 emddim = parameters["single","emddim"],
                                 delay = parameters["single","delay"]))
@@ -365,7 +365,7 @@ extract_rqa = function(data, parameters) {
                                 emddim = parameters["coordination","emddim"],
                                 delay = parameters["coordination","delay"]))
   
-  output = list(rqa_participant, rqa_interviewer, rqa_coordination)
+  output = list(rqa_interviewer, rqa_participant, rqa_coordination)
   
   return(output)
 }
@@ -373,16 +373,51 @@ extract_rqa = function(data, parameters) {
 extract_features = function(file) {
   info = get_info2(file)
   data = read.csv(file)
-  utterances_features = extract_utterance_features(data)
-  descriptive_features = extract_descriptive_features(data)
+  utterances_features = try(extract_utterance_features(data))
+  descriptive_features = try(extract_descriptive_features(data))
+  param = parameters = read.csv("clean_data/Split_data/final_parameters.csv", row.names = 1)
+  rqa_features = try(extract_rqa(data, parameters = param))
   
-  interviewer_features = cbind(info, 
+  interviewer_features = try(cbind(info, 
                                utterances_features[[1]],
-                               descriptive_features[[1]])
-  participant_features = cbind(info,
+                               descriptive_features[[1]],
+                               rqa_features[[1]]))
+  participant_features = try(cbind(info,
                                utterances_features[[2]],
-                               descriptive_features[[2]])
-  coordination_features = cbind(info,
+                               descriptive_features[[2]],
+                               rqa_features[[2]]))
+  coordination_features = try(cbind(info,
                                 utterances_features[[3]],
-                                descriptive_features[[3]])
+                                descriptive_features[[3]],
+                                rqa_features[[3]]))
+
+  output = list(interviewer_features, participant_features, coordination_features)
+  
+  return(output)
+}
+
+extract_features_folder = function(folder) {
+  all_files = list.files(folder, full.names = T)
+  
+  n=1
+  
+  interviewer_data = data.frame()
+  participant_data = data.frame()
+  coordination_data = data.frame()
+  for (file in all_files) {
+    all_features = try(extract_features(file = file))
+    
+    interviewer_data = rbind(interviewer_data, all_features[[1]])
+    participant_data = rbind(participant_data, all_features[[2]])
+    coordination_data = rbind(coordination_data, all_features[[3]])
+    
+    write.csv(interviewer_data, "clean_data/ML_ready/interviewer_data.csv", row.names = F)
+    write.csv(participant_data, "clean_data/ML_ready/participant_data.csv", row.names = F)
+    write.csv(coordination_data, "clean_data/ML_ready/coordination_data.csv", row.names = F)
+    
+    if (n%%200 == 0) {
+      print(paste(n, "out of 7028 files processed."))
+    }
+    n=n+1
+  }
 }

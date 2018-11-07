@@ -329,6 +329,8 @@ rownames(final_parameters) = c("single", "coordination")
 
 
 parameters = read.csv("clean_data/Split_data/final_parameters.csv", row.names = 1)
+
+sum(is.na(data))
 ```
 
 

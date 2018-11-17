@@ -84,13 +84,16 @@ prepare_data = function(data, single=T) {
   #remove signals that is more than 90% comprised of zeroes
   if (single==T) {
     data = subset(data, nbr.null<900)
-  } else data = subset(data, nbr.null<1800)
+  } else {
+    data = subset(data, nbr.null<1800)
+    data$RR_diff=NULL}
   
   data = subset(data, RR>0)
   
   #rename columns
   colnames(data)[4]="time"
   data[,2] = ifelse(data[,2]==1, "Schizophrenic", "Control")
+  data$RR=NULL
 
   return(data)
 }
@@ -171,9 +174,31 @@ Because I need to keep the time-representation in the data - downsampling would 
 ## Identify near-zero-variance features
 Some features might be unusable for modelling. We use 2 criterions to identify such features: frequence ratio and percent of unique values.
 ```{r}
-#nzv_c = nearZeroVar(data_c, saveMetrics = T)
-#nzv_i = nearZeroVar(data_i, saveMetrics = T)
-#nzv_p = nearZeroVar(data_p, saveMetrics = T)
+nzv_c = nearZeroVar(data_c[,-1:-3], saveMetrics = T)
+nzv_i = nearZeroVar(data_i, saveMetrics = T)
+nzv_p = nearZeroVar(data_p, saveMetrics = T)
+
+plot_nzv = function(nzv, data) {
+  library(ggrepel)
+  nzv$Status = ifelse(nzv$zeroVar == T | nzv$nzv ==T, yes="Fail", no="Pass")
+  nzv$Feature = rownames(nzv)
+  
+  plot = ggplot(nzv, aes(y=freqRatio, x=percentUnique, color=Status, label=Feature))+
+  geom_point()+
+  geom_label_repel(data=subset(nzv, Status=="Fail"), size=3, show.legend = F)+
+  ggtitle(paste("Near Zero Filter -", data))
+  theme_few()
+  
+  return(plot)
+}
+
+nzv_c_plot = plot_nzv(nzv_c, "Coordination")
+nzv_i_plot = plot_nzv(nzv_i, "Interviewer")
+nzv_p_plot = plot_nzv(nzv_p, "Participant")
+
+ggsave("Figures/nzv_filter_coordination.jpg", nzv_c_plot, width = 7, height = 2.5)
+ggsave("Figures/nzv_filter_interviewer.jpg", nzv_i_plot, width = 7, height =2.5)
+ggsave("Figures/nzv_filter_participant.jpg", nzv_p_plot, width = 7, height = 2.5)
 
 remove_c = nearZeroVar(data_c, saveMetrics = F)
 remove_i = nearZeroVar(data_i, saveMetrics = F)
@@ -262,14 +287,14 @@ inTrain_c = which(data_c$ID %in% trainIndex)
 inTrain_i = which(data_i$ID %in% trainIndex)
 inTrain_p = which(data_p$ID %in% trainIndex)
 
-data_c$set[-inTrain_c] = "test"
-data_c$set[inTrain_c] = "train"
+data_c[-inTrain_c, "set"] = "test"
+data_c[inTrain_c, "set"] = "train"
 
-data_i$set[-inTrain_i] = "test"
-data_i$set[inTrain_i] = "train"
+data_i[-inTrain_i, "set"] = "test"
+data_i[inTrain_i, "set"] = "train"
 
-data_p$set[-inTrain_p] = "test"
-data_p$set[inTrain_p] = "train"
+data_p[-inTrain_p, "set"] = "test"
+data_p[inTrain_p, "set"] = "train"
 ```
 
 Now all 3 datasets are truely ML-ready. Therefore we can save the final version now.

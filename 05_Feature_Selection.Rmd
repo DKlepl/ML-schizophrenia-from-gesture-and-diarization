@@ -1,0 +1,43 @@
+---
+title: "05 Feature Selection"
+author: "Dominik Klepl"
+date: "11/17/2018"
+output: html_document
+---
+
+# Load the data
+```{r}
+data_c = read.csv("clean_data/ML_ready/Final/coordination_data_final.csv")
+data_i = read.csv("clean_data/ML_ready/Final/interviewer_data_final.csv")
+data_p = read.csv("clean_data/ML_ready/Final/participant_data_final.csv")
+```
+
+## KEEP ONLY TEST dataset!!!
+```{r}
+data_c = subset(data_c, set=="train")
+data_i = subset(data_i, set=="train")
+data_p = subset(data_p, set=="train")
+```
+
+# Feature selection with Boruta
+```{r}
+library(Boruta)
+
+boruta_c = Boruta(diagnosis ~ ., data=data_c[,c(-1, -3, -4, -58)], doTrace=2)
+boruta_i = Boruta(diagnosis ~ ., data=data_i[,c(-1, -3, -4, -31)], doTrace=2)
+boruta_p = Boruta(diagnosis ~ ., data=data_p[,c(-1, -3, -4, -31)], doTrace=2)
+
+
+plot(boruta_c, cex.axis=.6, las=2, xlab="", main="Feature Selection") 
+plot(boruta_i, cex.axis=.7, las=2, xlab="", main="Feature Selection")
+plot(boruta_p, cex.axis=.7, las=2, xlab="", main="Feature Selection") 
+
+boruta_result_c = attStats(boruta_c)
+boruta_result_i = attStats(boruta_i)
+boruta_result_p = attStats(boruta_p)
+
+write_csv(boruta_result_c, "Feature_selection/Coordination_boruta_result.csv")
+write_csv(boruta_result_i, "Feature_selection/Interviewer_boruta_result.csv")
+write_csv(boruta_result_p, "Feature_selection/Participant_boruta_result.csv")
+```
+

@@ -1,0 +1,339 @@
+---
+title: "Feature Engineering"
+author: "Dominik Klepl"
+date: "10/15/2018"
+output: html_document
+---
+
+After the preprocessing phase the data is clean, actigraph data is tagged by speaker. Before the features can be extracted data from every participant will be split into small snippets and in 2 categories: single signal and synergy. 
+All snippets will be 10 seconds long. First I split all actigraph timeseries into smaller files which will have only signal of the speaker in given 10 seconds.
+Then these single speaker signals will be combined into consequtive pairs of signals for synergy analysis.
+Finally extract features from all the splitted signals: statistical and RQA.
+
+# 1. Single signal splitting
+
+Load all actigraph files from folder, choose one sample
+```{r}
+all_data = list.files("clean_data/Gesture", full.names = T)
+
+filename = all_data[1]
+
+data = read.csv(filename)
+data = data[,-1]
+anyNA(data)
+```
+
+Extract info from the filename
+```{r}
+get_info = function(file) {
+  filename = strsplit(file, "/")[[1]][3]
+  split = strsplit(filename, "_")[[1]]
+  info = data.frame(ID = split[1],
+                    right = split[2])
+  
+  return(info)
+}
+
+inf = get_info(filename)
+```
+
+Split the data by interlocutor and split these into 10 seconds long files. Save them in separate folders
+```{r}
+sampling = 100 #sampling of actigraph is 100 Hz
+len = 10 #split into 10 seconds long
+split = len * sampling
+
+data_psych = subset(data, interviewer==1)
+data_part = subset(data, interviewer==0)
+
+rownames(data_psych)=NULL
+rownames(data_part)=NULL
+
+n_splits_psych = trunc((nrow(data_psych)/split),0)
+n_splits_part = trunc((nrow(data_part)/split),0)
+
+#trim data to have lenght dividable by number of splits
+data_psych = data_psych[1:(n_splits_psych*split),]
+data_part = data_part[1:(n_splits_part*split),]
+
+data_psych$split = rep(1:n_splits_psych,each=split)
+data_part$split = rep(1:n_splits_part, each=split)
+
+splitted_psych = split(data_psych, data_psych$split)
+splitted_part = split(data_part, data_part$split)
+
+#loop through the list of dataframes, count utterances and save into its interlocutor's folder
+for (d in 1:length(splitted_psych)) {
+  dataframe = splitted_psych[[d]]
+  save_path = "clean_data/Split_data/Interviewer/"
+  filename = paste(info$ID, info$right, d, ".csv", sep = "_")
+  save_as = paste0(save_path, filename)
+  
+  write.csv(dataframe, save_as)
+}
+
+#the same for splitted_part
+for (d in 1:length(splitted_part)) {
+  dataframe = splitted_part[[d]]
+  save_path = "clean_data/Split_data/Participant/"
+  filename = paste(inf$ID, inf$right, d, ".csv", sep = "_")
+  save_as = paste0(save_path, filename)
+  
+  write.csv(dataframe, save_as)
+}
+```
+
+# 2. Forming coordination pairs
+Use the already splitted data into 10 seconds long chunks, combine them into pairs using the chunk order number (in the name of the file).
+
+First delete those data splits that cannot be matched because that interlocutor didn't speak that much.
+```{r}
+#copy contents of 'Interviewer' folder into 'Coordination/Interviewer_copy'
+original_interviewer = "clean_data/Split_data/Interviewer"
+copy_interviewer = "clean_data/Split_data/Coordination/Interviewer_copy"
+i_files = list.files(original_interviewer, full.names = T)
+i_copy_success = file.copy(i_files, copy_interviewer)
+sum(i_copy_success==F)
+
+#copy contents of 'Participant' folder into 'Coordination/Participant_copy'
+original_participant = "clean_data/Split_data/Participant"
+copy_participant = "clean_data/Split_data/Coordination/Participant_copy"
+p_files = list.files(original_participant, full.names = T)
+p_copy_success = file.copy(p_files, copy_participant)
+sum(p_copy_success==F)
+
+#load all files from the 'Interviewer' and 'Participant' folders inside of Coordination folder
+interviewer_files = list.files("clean_data/Split_data/Coordination/Interviewer_copy")
+participant_files = list.files("clean_data/Split_data/Coordination/Participant_copy")
+
+no_match_i = interviewer_files[(interviewer_files %in% participant_files) ==F]
+no_match_p = participant_files[(participant_files %in% interviewer_files) ==F]
+
+#sanity check
+length(interviewer_files)-length(no_match_i) == length(participant_files)-length(no_match_p)
+
+#delete files from both directories
+for (i in no_match_i) {
+  folder = "clean_data/Split_data/Coordination/Interviewer_copy/"
+  to_remove = paste0(folder, i)
+  try(file.remove(to_remove, recursive = T, force = T),silent = T)
+}
+
+for (i in no_match_p) {
+  folder = "clean_data/Split_data/Coordination/Participant_copy/"
+  to_remove = paste0(folder, i)
+  try(file.remove(to_remove, recursive = T, force = T), silent = T)
+}
+```
+
+Now form the coordination pairs, keep only relevant columns and save to new csv files.
+```{r}
+#list all files in one interlocutor's folder (doesnt matter which)
+all_files = list.files("clean_data/Split_data/Coordination/Interviewer_copy")
+
+#make the code work for one data split
+filename = all_files[1]
+
+#folders where all data splits are
+interviewer_folder = "clean_data/Split_data/Coordination/Interviewer_copy/"
+participant_folder = "clean_data/Split_data/Coordination/Participant_copy/"
+
+#construct the name of the 2 data splits
+interviewer_file = paste0(interviewer_folder, filename)
+participant_file = paste0(participant_folder, filename)
+
+data_interviewer = read.csv(interviewer_file)
+data_participant = read.csv(participant_file)
+
+#remove and rename columns to have unique column names in both dataframes
+data_interviewer = data_interviewer[,c(-4, -6)]
+colnames(data_interviewer) = c("PsychologistJerkLeft", "PsychologistJerkRight", "time_int", "utterance_n_int")
+
+data_participant = data_participant[,c(-4,-6)]
+colnames(data_participant) = c("ParticipanttJerkLeft", "ParticipantJerkRight", "time_par", "utterance_n_par")
+
+coordination_pair = cbind(data_interviewer, data_participant)
+
+#order the columns nicer
+coordination_pair = coordination_pair[,c(1,2,5,6,3,7,4,8), drop=F]
+
+#is the participant right- or left-handed?
+right = as.numeric(strsplit(filename,"_")[[1]][2])
+
+#keep only signal from the dominant hand of participant, unless that signal includes more than 200 zeroes, then keep the other hand signal
+if (right==1) {
+  if (sum(coordination_pair$ParticipantJerkRight==0)<200) {
+    coordination_pair = coordination_pair[,-3]
+  } else coordination_pair = coordination_pair[,-4]
+} else {
+  if (sum(coordination_pair$ParticipanttJerkLeft==0)<200) {
+    coordination_pair = coordination_pair[,-4]
+  } else coordination_pair = coordination_pair[,-3]
+}
+
+#keep only the signal from dominant hand of the psychologist (which is always right) unless the signal contains more than 200 zeroes, then keep the other hand signal
+if (sum(coordination_pair$PsychologistJerkRight==0)<200) {
+  coordination_pair = coordination_pair[,-1]
+} else coordination_pair = coordination_pair[,-2]
+
+#save the resulting file
+save_file = paste0("clean_data/Split_data/Coordination/", filename)
+write.csv(coordination_pair, save_file, row.names = F)
+```
+
+# 3. Feature extraction
+
+Load a 2 samples: single signal and coordination pair
+```{r}
+sample_s = "clean_data/Split_data/Participant/101_1_10_.csv"
+sample_c = "clean_data/Split_data/Coordination/101_1_10_.csv"
+
+single = read.csv(sample_s)
+coordination = read.csv(sample_c)
+```
+
+## 3.1 Info about participant and given data split
+Works for both single signal and coordination file
+```{r}
+filename = strsplit(sample_s, "/")[[1]][4]
+split = strsplit(filename, "_")[[1]]
+ID = split[1]
+if ((substr(ID,1,1))==1){
+  diagnosis = 1
+} else diagnosis = 0
+info = data.frame(ID = ID,
+                  diagnosis = diagnosis,
+                  right = split[2],
+                  split_n = split[3])
+```
+
+Count how many utterances are included in the data split from both interlocutors and what's the mean, maximal and minimal duration of the utterances.
+```{r}
+#info about the utterances - from single
+library(tidyverse)
+duration = single %>% group_by(utterance_n) %>% summarise(duration = max(time)-min(time))
+utterance_stats = pastecs::stat.desc(duration$duration)
+utterances_features = data.frame(n_utterances = utterance_stats[1],
+                                 median_duration = utterance_stats[8],
+                                 mean_duration = utterance_stats[9],
+                                 min_duration = utterance_stats[4],
+                                 max_duration = utterance_stats[5],
+                                 range_duration = utterance_stats[6],
+                                 sd_duration = utterance_stats[13],
+                                 iqr_duration = IQR(duration$duration))
+
+#from coordination file
+duration_int = coordination %>% group_by(utterance_n_int) %>% summarise(duration = max(time_int)-min(time_int))
+duration_par = coordination %>% group_by(utterance_n_par) %>% summarise(duration = max(time_par)-min(time_par))
+
+colnames(duration_int)[1] = 'utterance_n'
+colnames(duration_par)[1] = 'utterance_n'
+
+duration = rbind(duration_int, duration_par)
+
+utterance_stats = pastecs::stat.desc(duration$duration)
+utterances_features = data.frame(n_utterances = utterance_stats[1],
+                                 median_duration = utterance_stats[8],
+                                 mean_duration = utterance_stats[9],
+                                 min_duration = utterance_stats[4],
+                                 max_duration = utterance_stats[5],
+                                 range_duration = utterance_stats[6],
+                                 sd_duration = utterance_stats[13],
+                                 iqr_duration = IQR(duration$duration))
+```
+
+
+## 3.2 Statistical features
+
+Data from the coordination file needs to be transformed first - merge the signals.
+```{r}
+combined_signal = c(coordination[,1], coordination[,2])
+```
+
+Now compute various descriptive statistics about the signal
+```{r}
+descriptive_features = as.data.frame(t(pastecs::stat.desc(signal)))
+
+#some of the metrics in stat.desc are not necessary
+descriptive_features = descriptive_features[,c(-1,-3,-10,-11,-14)]
+
+#I don't like the name std.dev - rename it to sd
+colnames(descriptive_features)[9] = "sd"
+
+#add IQR
+descriptive_features$iqr = IQR(signal, na.rm = T)
+
+#add all 4 quantiles
+descriptive_features = cbind(descriptive_features,as.data.frame(t(quantile(signal))))
+
+#add median absolute deviation
+descriptive_features$mad = mad(signal)
+```
+
+## 3.3 RQA
+
+### 3.3.1 Parameter optimization
+Loop through files to optimize the parameters.
+
+One set of parameters for single signal data and another for coordination pairs. Based on assumption that 2 different systems produced the signals.
+
+```{r}
+library(crqa)
+
+#initialize parameters
+initial_par = list(lgM =  20, steps = seq(1, 6, 1), 
+radiusspan = 200, radiussample = 10, 
+normalize = 1, rescale = 1, mindiagline = 2, 
+minvertline = 2, tw = 0, whiteline = FALSE, 
+recpt = FALSE, fnnpercent = 10, typeami = "mindip")
+
+optim_par = optimizeParam(ts1 = signal, ts2 = signal, par = initial_par, min.rec = 3.5, max.rec = 4.5)
+
+rqa = crqa(signal,signal, radius = optim_par$radius, embed = optim_par$emddim, delay = optim_par$delay, normalize = 1, rescale = 1, mindiagline = 2, minvertline = 2)
+```
+
+### 3.3.2 Common parameters selection
+It's automated in the script. We explore the parameter space here and try to come up with properly motivated selection process.
+```{r}
+par_par = read.csv("clean_data/Split_data/parameters_participant.csv")
+par_int = read.csv("clean_data/Split_data/parameters_interviewer.csv")
+par_cor = read.csv("clean_data/Split_data/parameters_coordination.csv")
+
+#merge participant and interviewer
+par_single = rbind(par_par, par_int)
+
+par_single$radius = as.numeric(as.character(par_single$radius))
+par_single$emddim = as.numeric(as.character(par_single$emddim))
+par_single$delay = as.numeric(as.character(par_single$delay))
+
+par_cor$radius = as.numeric(as.character(par_cor$radius))
+par_cor$emddim = as.numeric(as.character(par_cor$emddim))
+par_cor$delay = as.numeric(as.character(par_cor$delay))
+
+par_single = na.omit(par_single)
+par_cor = na.omit(par_cor)
+
+hist(par_single$radius)
+hist(par_cor$radius)
+
+get_mode <- function(v) {
+   uniqv <- unique(v)
+   uniqv[which.max(tabulate(match(v, uniqv)))]
+}
+
+final_parameters = data.frame(emddim = c(max(par_single$emddim),max(par_cor$emddim)),
+                                delay = c(max(par_single$delay),max(par_cor$delay)),
+                                radius = c(get_mode(par_single$radius),get_mode(par_cor$radius)))
+
+rownames(final_parameters) = c("single", "coordination")
+
+
+parameters = read.csv("clean_data/Split_data/final_parameters.csv", row.names = 1)
+
+sum(is.na(data))
+```
+
+
+
+
+

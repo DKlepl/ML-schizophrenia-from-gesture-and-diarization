@@ -1,0 +1,280 @@
+---
+title: "04 Data exploration and final cleaning"
+author: "Dominik Klepl"
+date: "11/8/2018"
+output: html_document
+---
+
+In the folder "clean_data/ML_ready" there are csv files with data almost ready to be fed into some models.
+The RQA was run both with one average set of parameters and with parameters optimized uniquely for every time-series. First it needs to be decided which of these two to use.
+Some filtering and transformation of the data is needed first.
+
+Here are all the ML ready data.
+```{r}
+library(lme4)
+library(tidyverse)
+library(ggthemes)
+library(caret)
+all = list.files("clean_data/ML_ready", full.names = T)
+```
+
+Load all data
+```{r load data}
+data_c1 = read.csv(all[1])
+data_c2 = read.csv(all[2])
+data_i1 = read.csv(all[3])
+data_i2 = read.csv(all[3])
+data_p1 = read.csv(all[5])
+data_p2 = read.csv(all[6])
+```
+
+# Which RQA data should be used?
+```{r which parameters}
+data_c1 = subset(data_c1, nbr.null<1500)
+data_c2 = subset(data_c2, nbr.null<1500)
+data_i1 = subset(data_i1, nbr.null<500)
+data_i2 = subset(data_i2, nbr.null<500)
+data_p1 = subset(data_p1, nbr.null<500)
+data_p2 = subset(data_p2, nbr.null<500)
+
+data_c1 = na.omit(data_c1)
+data_c2 = na.omit(data_c2)
+data_i1 = na.omit(data_i1)
+data_i2 = na.omit(data_i2)
+data_p1 = na.omit(data_p1)
+data_p2 = na.omit(data_p2)
+
+c1 = glmer(diagnosis ~ RR + (1|ID), data_c1, family = "binomial", control = glmerControl(calc.derivs = F))
+c2 = glmer(diagnosis ~ RR + (1|ID), data_c2, family = "binomial", control = glmerControl(calc.derivs = F))
+i1 = glmer(diagnosis ~ RR + (1|ID), data_i1, family = "binomial", control = glmerControl(calc.derivs = F))
+i2 = glmer(diagnosis ~ RR + (1|ID), data_i2, family = "binomial", control = glmerControl(calc.derivs = F))
+p1 = glmer(diagnosis ~ RR + (1|ID), data_p1, family = "binomial", control = glmerControl(calc.derivs = F))
+p2 = glmer(diagnosis ~ RR + (1|ID), data_p2, family = "binomial", control = glmerControl(calc.derivs = F))
+
+summary(c1)
+summary(c2)
+summary(i1)
+summary(i2)
+summary(p1)
+summary(p2)
+
+#clean the environment
+rm(list = ls()[-1])
+```
+
+None of the models shows a significant difference in RR across diagnosis. Therefore all models will use the RQA results obtained with one set of parameters.
+
+Load only the data that will be used
+```{r load data}
+data_c = read.csv("clean_data/ML_ready/coordination_data_enhanced.csv")
+data_i = read.csv("clean_data/ML_ready/interviewer_data_enhanced.csv")
+data_p = read.csv("clean_data/ML_ready/participant_data_enhanced.csv")
+```
+
+
+# Final data processing
+Before making any machine learning, the data needs to be treated for missing values, corrupt data-splits (where the actigraphs were not picking up almost any signal) and remove duplicate feature columns and columns that don't include any ML usable information.
+
+```{r clean up}
+#the same should be done to all data files I have => write a function
+prepare_data = function(data, single=T) {
+  #remove NAs
+  data = na.omit(data)
+  
+  #remove signals that is more than 90% comprised of zeroes
+  if (single==T) {
+    data = subset(data, nbr.null<900)
+  } else data = subset(data, nbr.null<1800)
+  
+  data = subset(data, RR>0)
+  
+  #rename columns
+  colnames(data)[4]="time"
+  data[,2] = ifelse(data[,2]==1, "Schizophrenic", "Control")
+
+  return(data)
+}
+
+#now clean up all 3 datasets
+data_c = prepare_data(data_c, single = F)
+data_i = prepare_data(data_i)
+data_p = prepare_data(data_p)
+```
+
+For the sake of plotting and inspecting the data we turn all features to correct data-classes. This will be required every time the data is loaded => write a function.
+```{r change classes}
+change_classes = function(data) {
+  
+  factor_cols = c("diagnosis", "right", "time")
+  data[factor_cols] = lapply(data[factor_cols], as.factor)
+  
+  num_cols = c("time","n_utterances","nbr.null", "NRLINE", "maxL")
+  data[num_cols] = lapply(data[num_cols], as.numeric)
+  
+  
+  
+  return(data)
+}
+
+data_c = change_classes(data_c)
+data_i = change_classes(data_i)
+data_p = change_classes(data_p)
+```
+
+## Class balance
+The distribution is probably quite unbalanced, inspect the size of the imbalance and treat it appropriately.
+
+Plot the sample sizes and save to a production-ready plot.
+```{r plot class balance}
+balance_c = ggplot(data_c, aes(x=diagnosis, fill=diagnosis))+
+  geom_histogram(stat="count")+
+  scale_x_discrete(labels=c("Control"="C", "Schizophrenic"="S"))+
+  xlab("Coordination")+
+  theme_few()+
+  guides(fill=F)
+balance_i = ggplot(data_i, aes(x=diagnosis, fill=diagnosis))+
+  geom_histogram(stat="count")+
+  scale_x_discrete(labels=c("Control"="C", "Schizophrenic"="S"))+
+  theme_few()+
+  guides(fill=F)+
+  xlab("Interviewer")
+balance_p = ggplot(data_p, aes(x=diagnosis, fill=diagnosis))+
+  geom_histogram(stat="count")+
+  scale_x_discrete(labels=c("Control"="C", "Schizophrenic"="S"))+
+  theme_few()+
+  guides(fill=F)+
+  xlab("Participant")
+
+library(grid)
+class_balance = gridExtra::grid.arrange(balance_c, balance_i, balance_p, clip="on", ncol=3, top=textGrob("Sample size balance", gp=gpar(fontsize=20, font=3)))
+
+ggsave("Figures/Class_balance.jpg", class_balance, width = 6, height = 2)
+```
+
+Get also the numbers for report.
+```{r class balance numbers}
+balance_data = data.frame(Patient = c(sum(data_c$diagnosis==1),
+                                      sum(data_i$diagnosis==1),
+                                      sum(data_p$diagnosis==1)),
+                          Control = c(sum(data_c$diagnosis==0),
+                                      sum(data_i$diagnosis==0),
+                                      sum(data_p$diagnosis==0)),
+                          row.names = c("Coordination", 
+                                        "Interviewer", 
+                                        "Participant"))
+write.csv(balance_data, "Tables/Class_balance.csv")
+```
+
+I'll keep the imbalance as it is. The data will be upsampled within the subsampling during model training.
+Because I need to keep the time-representation in the data - downsampling would remove this but upsampling can cause model-bias and causes high differences in train-test evaluation metrics-
+
+## Identify near-zero-variance features
+Some features might be unusable for modelling. We use 2 criterions to identify such features: frequence ratio and percent of unique values.
+```{r}
+#nzv_c = nearZeroVar(data_c, saveMetrics = T)
+#nzv_i = nearZeroVar(data_i, saveMetrics = T)
+#nzv_p = nearZeroVar(data_p, saveMetrics = T)
+
+remove_c = nearZeroVar(data_c, saveMetrics = F)
+remove_i = nearZeroVar(data_i, saveMetrics = F)
+remove_p = nearZeroVar(data_p, saveMetrics = F)
+
+data_c = data_c[,-remove_c]
+data_i = data_i[,-remove_i]
+data_p = data_p[,-remove_p]
+```
+
+## Impute missing values
+```{r}
+library(caret)
+library(RANN)
+impute_model_c = preProcess(data_c[4:110], method = "bagImpute")
+data_c = predict(impute_model_c, data_c)
+
+impute_model_i = preProcess(data_i[4:57], method = "bagImpute")
+data_i = predict(impute_model_i, data_i)
+
+impute_model_p = preProcess(data_p[4:57], method = "bagImpute")
+data_p = predict(impute_model_p, data_p)
+```
+
+
+## Find potential linear combinations of features
+I still need to consider this step. It's basically looking for interactions/correlations. And removing such features could hurt models that wouldn't be able to find the interaction themselves.
+```{r}
+#these colums might be considered for removal
+linear_c = findLinearCombos(data_c[,4:65])
+linear_i = findLinearCombos(data_i[,4:34])
+linear_p = findLinearCombos(data_p[,4:34])
+
+remove_c = (linear_c$remove)+3
+remove_i = (linear_i$remove)+3
+remove_p = (linear_p$remove)+3
+
+remove_c = remove_c[c(-2,-3, -8)]
+remove_i = remove_i[-2]
+remove_p = remove_p[-2]
+
+data_c = data_c[,-remove_c]
+data_i = data_i[,-remove_i]
+data_p = data_p[,-remove_p]
+```
+
+## Correlation of predictors
+Some models prefer correlated data, some don't. We'll create an uncorrelated versions of datasets for these types of algorithms,
+```{r}
+cor_matrix_c <-  cor(data_c[4:ncol(data_c)])
+cor_c = findCorrelation(cor_matrix_c, cutoff = 0.9)
+cor_c = cor_c+3
+data_c_uncorrelated = data_c[,-cor_c]
+
+cor_matrix_i <-  cor(data_i[4:ncol(data_i)])
+cor_i = findCorrelation(cor_matrix_i, cutoff = 0.9)
+cor_i = cor_i+3
+data_i_uncorrelated = data_i[,-cor_i]
+
+cor_matrix_p <-  cor(data_p[4:ncol(data_p)])
+cor_p = findCorrelation(cor_matrix_p, cutoff = 0.9)
+cor_p = cor_p+3
+data_p_uncorrelated = data_p[,-cor_p]
+
+library(readr)
+write_csv(data_c_uncorrelated, "clean_data/ML_ready/Final/uncorrelated_coordination_data.csv")
+write_csv(data_i_uncorrelated, "clean_data/ML_ready/Final/uncorrelated_interviewer_data.csv")
+write_csv(data_p_uncorrelated, "clean_data/ML_ready/Final/uncorrelated_participant_data.csv")
+```
+
+# Train-test split
+```{r}
+#vectors with IDs
+ID_c = unique(data_c$ID)
+ID_i = unique(data_i$ID)
+ID_p = unique(data_p$ID)
+
+sum((ID_c ==ID_i)==F)
+sum((ID_c ==ID_p)==F)
+
+#split the vectors into 2 while keeping samples from same ID together
+trainIndex = createDataPartition(ID_c, p=0.75, list = F)
+trainIndex = ID_c[trainIndex]
+
+inTrain_c = which(data_c$ID %in% trainIndex)
+inTrain_i = which(data_i$ID %in% trainIndex)
+inTrain_p = which(data_p$ID %in% trainIndex)
+
+data_c$set[-inTrain_c] = "test"
+data_c$set[inTrain_c] = "train"
+
+data_i$set[-inTrain_i] = "test"
+data_i$set[inTrain_i] = "train"
+
+data_p$set[-inTrain_p] = "test"
+data_p$set[inTrain_p] = "train"
+```
+
+Now all 3 datasets are truely ML-ready. Therefore we can save the final version now.
+```{r save data}
+write_csv(data_c, "clean_data/ML_ready/Final/coordination_data_final.csv")
+write_csv(data_i, "clean_data/ML_ready/Final/interviewer_data_final.csv")
+write_csv(data_p, "clean_data/ML_ready/Final/participant_data_final.csv")
+```

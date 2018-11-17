@@ -1,0 +1,78 @@
+---
+title: "05 Machine Learning"
+author: "Dominik Klepl"
+date: "11/10/2018"
+output: html_document
+---
+
+# Required libraries
+```{r}
+pacman::p_load("caret", "DALEX")
+```
+
+# Load the data
+```{r}
+data_c = read.csv("clean_data/ML_ready/Final/coordination_data_final.csv")
+data_i = read.csv("clean_data/ML_ready/Final/interviewer_data_final.csv")
+data_p = read.csv("clean_data/ML_ready/Final/participant_data_final.csv")
+```
+
+#Initialize Parallel processing
+```{r}
+library(doParallel)
+
+workers <- makePSOCKcluster(3)
+registerDoParallel(workers)
+stopCluster(workers)
+```
+
+
+#K-fold CV index function
+I can't use the built-in function for CV because that wouldn't keep samples from same person together. I need to create index to be used for this
+```{r}
+folds_c = groupKFold(train_c$ID, k=10)
+
+fitControl = trainControl(method = "repeatedcv", number = 10, repeats = 5, index = folds_c, sampling = "up", summaryFunction = twoClassSummary, classProbs = T)
+
+geneticCtrl = gafsControl(functions = rfGA,
+                       method = "cv",
+                       number = 6, index = folds_c)
+
+rf_ga = gafs(x = train_c[,4:110], y = train_c[,2],
+              iters = 200,
+              gafsControl = geneticCtrl)
+
+rf_c = train(diagnosis ~ ., data = train_c[c(2,4:65)], 
+                 method = "rf", 
+                 trControl = fitControl,
+                 metric = "ROC")
+
+svm_poly_c = train(diagnosis ~ ., data = train_c[c(2,4:65)], 
+                 method = "svmPoly", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 verbose = FALSE)
+
+svm_rad = train(diagnosis ~ ., data = train_c[c(2,4:65)], 
+                 method = "svmRadial", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 verbose = FALSE)
+
+svm_rad = train(diagnosis ~ ., data = train_c[c(2,4:65)], 
+                 method = "svmRadial", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 verbose = FALSE)
+
+xgbTree_c = train(diagnosis ~ ., data = train_c[c(2,4:65)], 
+                 method = 'xgbTree', 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 verbose = FALSE)
+
+plot(gbm_c)
+plot(rf_c)
+bMARS
+```
+

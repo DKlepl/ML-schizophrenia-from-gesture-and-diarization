@@ -1,0 +1,63 @@
+---
+title: "03 Feature engineering"
+author: "Dominik Klepl"
+date: "11/15/2018"
+output: html_document
+---
+
+## Load data
+```{r}
+data_c = read.csv("clean_data/ML_ready/coordination_data.csv")
+data_i = read.csv("clean_data/ML_ready/interviewer_data.csv")
+data_p = read.csv("clean_data/ML_ready/participant_data.csv")
+
+colnames(data_c)[4]="time"
+colnames(data_i)[4]="time"
+colnames(data_p)[4]="time"
+```
+
+## Difference between single signal features
+Some additional features about coordination can be created - linear combination of single signal features, most efficient might be difference (patient-interviewer).
+```{r}
+#quantify the difference between the interviewer's and participant's gesturing systems - patient-interviewer
+difference_features = data_p[,5:37]-data_i[,5:37]
+
+#rename the columns to avoid duplicate column names
+col_names = colnames(difference_features)
+col_names = paste(col_names, "diff", sep="_")
+colnames(difference_features)=col_names
+
+data_c = cbind(data_c,difference_features)
+```
+
+## Time*feature interaction
+The coordination between interlocutors is established over time. Therefore data points from early in the interview should have lower prediction power. It is possible that some models could find such interaction but it will be better to create such interaction implicitly as a new feature columns.
+```{r}
+data_c_time = data_c[,c(13:37,46:70)]*data_c$time
+col_names = colnames(data_c_time)
+col_names = paste(col_names, "time", sep="*")
+colnames(data_c_time)=col_names
+data_c = cbind(data_c, data_c_time)
+
+data_i_time = data_i[,13:37]*data_i$time
+col_names = colnames(data_i_time)
+col_names = paste(col_names, "time", sep="*")
+colnames(data_i_time)=col_names
+data_i = cbind(data_i, data_i_time)
+
+data_p_time = data_p[,13:37]*data_p$time
+col_names = colnames(data_p_time)
+col_names = paste(col_names, "time", sep="*")
+colnames(data_p_time)=col_names
+data_p = cbind(data_p, data_p_time)
+
+
+```
+
+```{r}
+library(readr)
+write_csv(data_c, "clean_data/ML_ready/coordination_data_enhanced.csv")
+write_csv(data_i, "clean_data/ML_ready/interviewer_data_enhanced.csv")
+write_csv(data_p, "clean_data/ML_ready/participant_data_enhanced.csv")
+```
+

@@ -7,38 +7,243 @@ output: html_document
 
 # Load the data
 ```{r}
+library(readr)
+library(ggthemes)
+library(ggplot2)
 data_c = read.csv("clean_data/ML_ready/Final/coordination_data_final.csv")
 data_i = read.csv("clean_data/ML_ready/Final/interviewer_data_final.csv")
 data_p = read.csv("clean_data/ML_ready/Final/participant_data_final.csv")
 ```
 
-## KEEP ONLY TEST dataset!!!
+## KEEP ONLY TRAIN dataset!!!
 ```{r}
 data_c = subset(data_c, set=="train")
 data_i = subset(data_i, set=="train")
 data_p = subset(data_p, set=="train")
+
+data_c = data_c[,c(-1,-3,-4,-53)]
+data_i = data_i[,c(-1,-3,-4,-29)]
+data_p = data_p[,c(-1,-3,-4,-29)]
 ```
 
 # Feature selection with Boruta
 ```{r}
 library(Boruta)
 
-boruta_c = Boruta(diagnosis ~ ., data=data_c[,c(-1, -3 , -58)],maxRuns=200 ,doTrace=2)
-boruta_i = Boruta(diagnosis ~ ., data=data_i[,c(-1, -3 , -31)], maxRuns=200 ,doTrace=2)
-boruta_p = Boruta(diagnosis ~ ., data=data_p[,c(-1, -3, -31)], maxRuns=200 , doTrace=2)
+boruta_c = Boruta(diagnosis ~ ., data=data_c,maxRuns=100 ,doTrace=2)
+boruta_c = TentativeRoughFix(boruta_c)
+boruta_i = Boruta(diagnosis ~ ., data=data_i, maxRuns=100 ,doTrace=2)
+boruta_i = TentativeRoughFix(boruta_i)
+boruta_p = Boruta(diagnosis ~ ., data=data_p, maxRuns=100 , doTrace=2)
+boruta_p = TentativeRoughFix(boruta_p)
 
-
-plot(boruta_c, cex.axis=.6, las=2, xlab="", main="Feature Selection") 
-plot(boruta_i, cex.axis=.7, las=2, xlab="", main="Feature Selection")
-plot(boruta_p, cex.axis=.7, las=2, xlab="", main="Feature Selection") 
-
-boruta_result_c = attStats(b)
+boruta_result_c = attStats(boruta_c)
 boruta_result_i = attStats(boruta_i)
 boruta_result_p = attStats(boruta_p)
+
+boruta_result_c$feature = rownames(boruta_result_c)
+boruta_result_i$feature = rownames(boruta_result_i)
+boruta_result_p$feature = rownames(boruta_result_p)
 
 
 write_csv(boruta_result_c, "Feature_selection/Coordination_boruta_result.csv")
 write_csv(boruta_result_i, "Feature_selection/Interviewer_boruta_result.csv")
 write_csv(boruta_result_p, "Feature_selection/Participant_boruta_result.csv")
+```
+
+Plot boruta results
+```{r}
+library(ggplot2)
+library(ggthemes)
+
+boruta_result_c = readr::read_csv("Feature_selection/Coordination_boruta_result.csv")
+boruta_result_i = readr::read_csv("Feature_selection/Interviewer_boruta_result.csv")
+boruta_result_p = readr::read_csv("Feature_selection/Participant_boruta_result.csv")
+
+plot_boruta = function(result, data) {
+  
+  dodge = position_dodge(width = 0.05)
+  plot = ggplot(result, aes(x=reorder(feature, medianImp), y=medianImp, fill=decision))+
+    geom_col(position = dodge)+
+    geom_errorbar(aes(ymin=minImp, ymax=maxImp, alpha=0.5), position = dodge)+
+    guides(alpha=F)+
+    theme_few()+
+    theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 10, lineheight = 8))+
+    labs(title = paste("Feature Selection -", data), x="Feature", y="Estimated importance")+
+    scale_fill_manual(breaks=c("Confirmed", "Rejected"),values = c("green", "red"))
+  
+  return(plot)
+}
+
+plot_c = plot_boruta(boruta_result_c, "Coordination")
+plot_i = plot_boruta(boruta_result_i, "Interviewer")
+plot_p = plot_boruta(boruta_result_p, "Participant")
+
+ggsave("Feature_selection/Coordination_boruta.jpg", plot_c, width = 14, height = 6)
+ggsave("Feature_selection/Interviewer_boruta.jpg", plot_i, width = 14, height = 6)
+ggsave("Feature_selection/Participant_boruta.jpg", plot_p, width = 14, height = 6)
+```
+
+
+#Feature selection with MARS
+```{r}
+library(earth)
+
+#coordination
+earth_c = earth(diagnosis ~., data=data_c, degree = 2, glm = list(family=binomial), nfold = 10, ncross = 5, trace = 2)
+
+earth_c_imp = evimp(earth_c)
+write.csv(earth_c_imp, "Feature_selection/Earth_coordination.csv")
+
+#interviewer
+earth_i = earth(diagnosis ~., data=data_i, degree = 1, glm = list(family=binomial), nfold = 10, ncross = 5, trace = 2)
+
+earth_i_imp = evimp(earth_i)
+write.csv(earth_i_imp, "Feature_selection/Earth_interviewer.csv")
+
+#participant
+earth_p = earth(diagnosis ~., data=data_p, degree = 2, glm = list(family=binomial), nfold = 10, ncross = 5, trace=2)
+
+earth_p_imp = evimp(earth_p)
+write.csv(earth_p_imp, "Feature_selection/Earth_participant.csv")
+```
+
+Plot MARS
+```{r}
+c = read_csv("Feature_selection/Earth_coordination.csv")
+p = read_csv("Feature_selection/Earth_participant.csv")
+
+#change legend title
+plot_earth = function(result, data) {
+  plot = ggplot(result, aes(x=reorder(X1, -nsubsets)))+
+  geom_point(aes(y=nsubsets, group=1, color="red"), stat = "summary", fun.y=sum)+
+  stat_summary(aes(y=nsubsets, group=1, color="red"),fun.y=sum, geom="line")+
+  geom_point(aes(y=gcv, group=2, color="blue"), stat = "summary", fun.y=sum)+
+  stat_summary(aes(y=gcv, group=2, color="blue"),fun.y=sum, geom="line")+
+  geom_point(aes(y=rss, group=3, color="green"), stat = "summary", fun.y=sum)+
+  stat_summary(aes(y=rss, group=3, color="green"),fun.y=sum, geom="line")+
+  labs(title = paste("Feature Selection -", data), x="Feature", y="Importance")+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 10, lineheight = 8))+
+  scale_color_manual(labels=c("Nsubsets", "GCV", "RSS"), values = c("red", "blue", "green"))
+  
+  ggsave(paste0("Feature_selection/", data, "_earth.jpg"), plot, width = 14, height = 6)
+  
+  return(plot)
+}
+ 
+plot_earth(c, "Coordination")
+plot_earth(p, "Participant")
+```
+
+# Feature-target trend exploration
+```{r} 
+#coordination data
+library(caret)
+data_c = read.csv("clean_data/ML_ready/Final/coordination_data_final.csv")
+data_c$diagnosis = ifelse(data_c$diagnosis=="Control", 0, 1)
+data_c = data_c[,c(-1,-3,-4)]
+data_c$n_utterances = as.numeric(data_c$n_utterances)
+data_c$nbr.null = as.numeric(data_c$nbr.null)
+data_c$maxL = as.numeric(data_c$maxL)
+data_c$nbr.null_diff = as.numeric(data_c$nbr.null_diff)
+data_c$n_utterances_diff = as.numeric(data_c$n_utterances_diff)
+data_c$NRLINE_diff = as.numeric(data_c$NRLINE_diff)
+data_c$NRLINE = as.numeric(data_c$NRLINE)
+train_c = subset(data_c, set=="train")
+test_c = subset(data_c, set=="test")
+train_c = train_c[,-50]
+test_c = test_c[,-50]
+rm(data_c)
+
+library(reticulate)
+use_condaenv("r-reticulate")
+
+featexp = import("featexp")
+
+featexp_c = featexp$get_trend_stats(data = train_c, data_test = test_c, target_col = "diagnosis")
+featexp_c = subset(featexp_c, Trend_correlation>0.80)
+write.csv(featexp_c, "Feature_selection/Coordination_featexp.csv")
+
+#participant
+data_p = read.csv("clean_data/ML_ready/Final/interviewer_data_final.csv")
+data_p$diagnosis = ifelse(data_p$diagnosis=="Control", 0, 1)
+data_p = data_p[,c(-1,-3,-4)]
+data_p$n_utterances = as.numeric(data_p$n_utterances)
+data_p$nbr.null = as.numeric(data_p$nbr.null)
+data_p$NRLINE = as.numeric(data_p$NRLINE)
+train_p = subset(data_p, set=="train")
+test_p = subset(data_p, set=="test")
+train_p = train_p[,-26]
+test_p = test_p[,-26]
+rm(data_p)
+
+featexp_p = featexp$get_trend_stats(data = train_p, data_test = test_p, target_col = "diagnosis")
+featexp_p = subset(featexp_p, Trend_correlation>0.80)
+
+write.csv(featexp_p, "Feature_selection/Participant_featexp.csv")
+
+rm(list=ls())
+```
+
+# Select features
+
+The process is the same for all 3 datasets => function time
+```{r}
+selectFeat = function (type=c("C", "I", "P")) {
+  if (type=="C") {
+    name1 = "Coordination"
+    name2 = "coordination"
+    set = 53
+  }
+  if (type=="I") {
+    name1 = "Interviewer"
+    name2 = "interviewer"
+    set = 34
+  }
+  if (type=="P") {
+    name1 = "Participant"
+    name2 = "participant"
+    set = 29
+  }
+  
+  info_cols = c(1:4, set)
+  
+  boruta = read.csv(paste0("Feature_selection/", name1,"_boruta_result.csv"))
+  earth = read.csv(paste0("Feature_selection/Earth_", name2, ".csv"))
+  featexp = read.csv(paste0("Feature_selection/", name1,"_featexp.csv"))
+  data = read.csv(paste0("clean_data/ML_ready/Final/",name2,"_data_final.csv"))
+
+  boruta = subset(boruta, decision=="Confirmed")
+  
+  #calculate correlation and remove strongly correlated features
+  cor_matrix <-  cor(data[4:(ncol(data)-1)])
+  cor = findCorrelation(cor_matrix, cutoff = 0.9)
+  cor = cor+3
+
+  #get only names of the features
+  boruta = as.character(boruta$feature)
+  earth = as.character(earth[,1])
+  featexp = as.character(featexp$Feature)
+  
+  
+  data_boruta = cbind(data[,info_cols],data[,boruta])
+  data_earth = cbind(data[,info_cols],data[,earth])
+  data_featexp = cbind(data[,info_cols],data[,featexp])
+  data_uncorrelated = data[,-cor]
+  
+  
+  
+  write.csv(data_boruta, paste0("clean_data/ML_data/", name1, "_boruta.csv"), row.names = F)
+  write.csv(data_earth, paste0("clean_data/ML_data/", name1, "_earth.csv"), row.names = F)
+  write.csv(data_featexp, paste0("clean_data/ML_data/", name1, "_featexp.csv"), row.names = F)
+  write.csv(data_uncorrelated, paste0("clean_data/ML_data/", name1, "_uncorrelated.csv"), row.names = F)
+  write.csv(data, paste0("clean_data/ML_data/", name1, "_full.csv"), row.names = F)
+}
+```
+
+```{r}
+selectFeat("C")
+selectFeat("I")
+selectFeat("P")
 ```
 

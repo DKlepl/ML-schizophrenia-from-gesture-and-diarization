@@ -82,11 +82,7 @@ prepare_data = function(data, single=T) {
   data = na.omit(data)
   
   #remove signals that is more than 90% comprised of zeroes
-  if (single==T) {
-    data = subset(data, nbr.null<900)
-  } else {
-    data = subset(data, nbr.null<1800)
-    data$RR_diff=NULL}
+  if (single==F) {data$RR_diff=NULL}
   
   data = subset(data, RR>0)
   
@@ -111,7 +107,7 @@ change_classes = function(data) {
   factor_cols = c("diagnosis", "right", "time")
   data[factor_cols] = lapply(data[factor_cols], as.factor)
   
-  num_cols = c("time","n_utterances","nbr.null", "NRLINE", "maxL")
+  num_cols = c("n_utterances","nbr.null", "NRLINE", "maxL")
   data[num_cols] = lapply(data[num_cols], as.numeric)
   
   
@@ -156,20 +152,29 @@ ggsave("Figures/Class_balance.jpg", class_balance, width = 6, height = 2)
 
 Get also the numbers for report.
 ```{r class balance numbers}
-balance_data = data.frame(Patient = c(sum(data_c$diagnosis==1),
-                                      sum(data_i$diagnosis==1),
-                                      sum(data_p$diagnosis==1)),
-                          Control = c(sum(data_c$diagnosis==0),
-                                      sum(data_i$diagnosis==0),
-                                      sum(data_p$diagnosis==0)),
+balance_data = data.frame(Patient = c(sum(data_c$diagnosis=="Schizophrenic"),
+                                      sum(data_i$diagnosis=="Schizophrenic"),
+                                      sum(data_p$diagnosis=="Schizophrenic")),
+                          Control = c(sum(data_c$diagnosis=="Control"),
+                                      sum(data_i$diagnosis=="Control"),
+                                      sum(data_p$diagnosis=="Control")),
                           row.names = c("Coordination", 
                                         "Interviewer", 
                                         "Participant"))
 write.csv(balance_data, "Tables/Class_balance.csv")
 ```
 
-I'll keep the imbalance as it is. The data will be upsampled within the subsampling during model training.
-Because I need to keep the time-representation in the data - downsampling would remove this but upsampling can cause model-bias and causes high differences in train-test evaluation metrics-
+So I need to treat the imbalance in the data.
+```{r}
+data_c = downSample(data_c, data_c$diagnosis, yname="diagnosis")
+data_i = downSample(data_i, data_i$diagnosis, yname="diagnosis")
+data_p = downSample(data_p, data_p$diagnosis, yname="diagnosis")
+
+data_c = data_c[,-63]
+data_i = data_i[,-34]
+data_p = data_p[,-34]
+```
+
 
 ## Identify near-zero-variance features
 Some features might be unusable for modelling. We use 2 criterions to identify such features: frequence ratio and percent of unique values.
@@ -186,7 +191,7 @@ plot_nzv = function(nzv, data) {
   plot = ggplot(nzv, aes(y=freqRatio, x=percentUnique, color=Status, label=Feature))+
   geom_point()+
   geom_label_repel(data=subset(nzv, Status=="Fail"), size=3, show.legend = F)+
-  ggtitle(paste("Near Zero Filter -", data))
+  ggtitle(paste("Near Zero Variance Filter -", data))
   theme_few()
   
   return(plot)
@@ -209,64 +214,25 @@ data_i = data_i[,-remove_i]
 data_p = data_p[,-remove_p]
 ```
 
-## Impute missing values
-```{r}
-library(caret)
-library(RANN)
-impute_model_c = preProcess(data_c[4:110], method = "bagImpute")
-data_c = predict(impute_model_c, data_c)
-
-impute_model_i = preProcess(data_i[4:57], method = "bagImpute")
-data_i = predict(impute_model_i, data_i)
-
-impute_model_p = preProcess(data_p[4:57], method = "bagImpute")
-data_p = predict(impute_model_p, data_p)
-```
-
-
 ## Find potential linear combinations of features
 I still need to consider this step. It's basically looking for interactions/correlations. And removing such features could hurt models that wouldn't be able to find the interaction themselves.
 ```{r}
 #these colums might be considered for removal
-linear_c = findLinearCombos(data_c[,4:65])
-linear_i = findLinearCombos(data_i[,4:34])
-linear_p = findLinearCombos(data_p[,4:34])
+linear_c = findLinearCombos(data_c[,-1:-4])
+linear_i = findLinearCombos(data_i[,-1:-4])
+linear_p = findLinearCombos(data_p[,-1:-4])
 
-remove_c = (linear_c$remove)+3
-remove_i = (linear_i$remove)+3
-remove_p = (linear_p$remove)+3
+remove_c = (linear_c$remove)+4
+remove_i = (linear_i$remove)+4
+remove_p = (linear_p$remove)+4
 
-remove_c = remove_c[c(-2,-3, -8)]
-remove_i = remove_i[-2]
-remove_p = remove_p[-2]
+colnames(data_c[,remove_c])
+colnames(data_i[,remove_i])
+colnames(data_p[,remove_p])
 
 data_c = data_c[,-remove_c]
 data_i = data_i[,-remove_i]
 data_p = data_p[,-remove_p]
-```
-
-## Correlation of predictors
-Some models prefer correlated data, some don't. We'll create an uncorrelated versions of datasets for these types of algorithms,
-```{r}
-cor_matrix_c <-  cor(data_c[4:ncol(data_c)])
-cor_c = findCorrelation(cor_matrix_c, cutoff = 0.9)
-cor_c = cor_c+3
-data_c_uncorrelated = data_c[,-cor_c]
-
-cor_matrix_i <-  cor(data_i[4:ncol(data_i)])
-cor_i = findCorrelation(cor_matrix_i, cutoff = 0.9)
-cor_i = cor_i+3
-data_i_uncorrelated = data_i[,-cor_i]
-
-cor_matrix_p <-  cor(data_p[4:ncol(data_p)])
-cor_p = findCorrelation(cor_matrix_p, cutoff = 0.9)
-cor_p = cor_p+3
-data_p_uncorrelated = data_p[,-cor_p]
-
-library(readr)
-write_csv(data_c_uncorrelated, "clean_data/ML_ready/Final/uncorrelated_coordination_data.csv")
-write_csv(data_i_uncorrelated, "clean_data/ML_ready/Final/uncorrelated_interviewer_data.csv")
-write_csv(data_p_uncorrelated, "clean_data/ML_ready/Final/uncorrelated_participant_data.csv")
 ```
 
 # Train-test split
@@ -299,7 +265,7 @@ data_p[inTrain_p, "set"] = "train"
 
 Now all 3 datasets are truely ML-ready. Therefore we can save the final version now.
 ```{r save data}
-write_csv(data_c, "clean_data/ML_ready/Final/coordination_data_final.csv")
-write_csv(data_i, "clean_data/ML_ready/Final/interviewer_data_final.csv")
-write_csv(data_p, "clean_data/ML_ready/Final/participant_data_final.csv")
+write.csv(data_c, "clean_data/ML_ready/Final/coordination_data_final.csv", row.names = F)
+write.csv(data_i, "clean_data/ML_ready/Final/interviewer_data_final.csv", row.names = F)
+write.csv(data_p, "clean_data/ML_ready/Final/participant_data_final.csv", row.names = F)
 ```

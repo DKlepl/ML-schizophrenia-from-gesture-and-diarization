@@ -269,3 +269,55 @@ write.csv(data_c, "clean_data/ML_ready/Final/coordination_data_final.csv", row.n
 write.csv(data_i, "clean_data/ML_ready/Final/interviewer_data_final.csv", row.names = F)
 write.csv(data_p, "clean_data/ML_ready/Final/participant_data_final.csv", row.names = F)
 ```
+
+# Get stats about n_samples and IDs in train-test data and class balance
+```{r}
+data_c = read.csv("clean_data/ML_ready/Final/coordination_data_final.csv")
+data_c_train = subset(data_c, set=="train")
+data_c_test = subset(data_c, set=="test")
+
+data_p = read.csv("clean_data/ML_ready/Final/participant_data_final.csv")
+data_p_train = subset(data_p, set=="train")
+data_p_test = subset(data_p, set=="test")
+library(tidyverse)
+
+samples_info = function(data) {
+  #number of samples per participant
+  n_samples = data %>% group_by(ID) %>% summarise(samples=n(), diagnosis=diagnosis[1])
+  
+  samples_dia_effect = lm(samples ~ diagnosis, n_samples)
+  result = summary(samples_dia_effect)$coefficients[2,1:4]
+  
+  info = data.frame(
+    #number of participants
+    size = nrow(data),
+    ID = length(unique(data$ID)),
+    #class balance
+    Schizophrenic = sum(data$diagnosis=="Schizophrenic"),
+    Control = sum(data$diagnosis=="Control"),
+    `samples mean` = mean(n_samples$samples),
+    `samples SD` = sd(n_samples$samples),
+    ß = result[1],
+    `t value` = result[3],
+    `Pr(>|t|)` = result[4] 
+  )
+  
+  return(info)
+}
+
+info_train_c = samples_info(data_c_train)
+info_test_c = samples_info(data_c_test)
+info_c = rbind(info_train_c, info_test_c)
+row.names(info_c)=c("Training", "Validation")
+
+info_train_p = samples_info(data_p_train)
+info_test_p = samples_info(data_p_test)
+info_p = rbind(info_train_p, info_test_p)
+row.names(info_p)=c("Training", "Validation")
+
+info = rbind(info_p, info_c)
+
+write.csv(info, "Tables/Balance_sample_size_all.csv")
+```
+
+

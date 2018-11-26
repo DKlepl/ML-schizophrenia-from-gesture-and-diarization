@@ -7,7 +7,7 @@ output: html_document
 
 # Import functions
 ```{r}
-pacman::p_load("caret", "DALEX", "tidyverse")
+pacman::p_load("caret", "DALEX", "tidyverse", "pROC")
 source("Scripts/modelling_fuctions.R")
 ```
 
@@ -35,9 +35,10 @@ model_test_p = data.frame()
 for (i in 1:length(best_p)) {
   model = best_p[[i]]
   one_cm = confusionMatrix(data=predict(model, p_data$X_test), reference = p_data$Y_test, mode="everything")
+  auc = auc(p_data$Y_test, predict(model, p_data$X_test, type = "prob")[,1])
   overall = as.data.frame(t(as.data.frame(one_cm$overall)))
   byclass = as.data.frame(t(as.data.frame(one_cm$byClass)))
-  one_model = cbind(overall, byclass)
+  one_model = cbind(auc,overall, byclass)
   one_model$model = model$method
   model_test_p = rbind(model_test_p, one_model)
 }
@@ -47,9 +48,10 @@ model_test_c = data.frame()
 for (i in 1:length(best_c)) {
   model = best_c[[i]]
   one_cm = confusionMatrix(data=predict(model, c_data$X_test), reference = c_data$Y_test, mode="everything")
+  auc = auc(c_data$Y_test, predict(model, c_data$X_test, type = "prob")[,1])
   overall = as.data.frame(t(as.data.frame(one_cm$overall)))
   byclass = as.data.frame(t(as.data.frame(one_cm$byClass)))
-  one_model = cbind(overall, byclass)
+  one_model = cbind(auc, overall, byclass)
   one_model$model = model$method
   model_test_c = rbind(model_test_c, one_model)
 }
@@ -73,7 +75,7 @@ finalPrediction = function (which = c("C", "P"), model) {
   predictions$time = subset(data$no_model, set=="test")$time
   
   sum_pred = predictions %>% group_by(ID) %>% summarise(n_samples = n(), Schizophrenic=weighted.mean(x=Schizophrenic, w=time), diagnosis=mean(diagnosis))
-  
+  auc = auc(sum_pred$diagnosis, sum_pred$Schizophrenic)
   
   sum_pred$decision_s = ifelse(sum_pred$Schizophrenic>=0.5, "Schizophrenic", "Control")
   sum_pred$diagnosis = ifelse(sum_pred$diagnosis==1, "Schizophrenic", "Control")
@@ -82,45 +84,42 @@ finalPrediction = function (which = c("C", "P"), model) {
   sum_pred$diagnosis = as.factor(sum_pred$diagnosis)
   
   
-  output = confusionMatrix(data=sum_pred$decision_s, reference = sum_pred$diagnosis, positive = "Schizophrenic")
+  cM = confusionMatrix(data=sum_pred$decision_s, reference = sum_pred$diagnosis, positive = "Schizophrenic")
   
-  return(output)
+  overall = as.data.frame(rbind(cM$overall))
+  byclass = as.data.frame(rbind(cM$byClass))
+  
+  perf = cbind(auc, overall, byclass)
+  
+  return(perf)
 }
 ```
 
 
 For participant model - NO information rate = 0.5
 ```{r}
-p_nn = finalPrediction("P", best_p$boruta_avNNet)[3:4]
-p_bayes = finalPrediction("P", best_p$boruta_bayes)[3:4]
-p_log = finalPrediction("P", best_p$boruta_logistic)[3:4]
-p_rf = finalPrediction("P", best_p$boruta_rf)[3:4]
-p_xgb = finalPrediction("P", best_p$boruta_xboost)[3:4]
+p_nn = finalPrediction("P", best_p$boruta_avNNet)
+p_bayes = finalPrediction("P", best_p$boruta_bayes)
+p_log = finalPrediction("P", best_p$boruta_logistic)
+p_rf = finalPrediction("P", best_p$boruta_rf)
+p_xgb = finalPrediction("P", best_p$boruta_xboost)
 
-average_prediction_p = data.frame(Model=c("avNNet", "Naive Bayes", "Penalized Logistic Regression", "Random Forest", "XGBoost"))
-overall = as.data.frame(rbind(p_nn$overall, p_bayes$overall, p_log$overall, p_rf$overall, p_xgb$overall))
-byclass = as.data.frame(rbind(p_nn$byClass, p_bayes$byClass, p_log$byClass, p_rf$byClass, p_xgb$byClass))
-
-average_prediction_p = cbind(average_prediction_p, overall, byclass)
-average_prediction_p = average_prediction_p[,c(-4:-8, -11:-19)]
+average_prediction_p = rbind(p_nn, p_bayes, p_log, p_rf, p_xgb)
+average_prediction_p$Model = c("avNNet", "Naive Bayes", "Penalized Logistic Regression", "Random Forest", "XGBoost")
 
 write.csv(average_prediction_p, "Model_evaluation/Averaged_prediction_participant.csv", row.names = F)
 ```
 
 Coordination model - No information rate = 0.5
 ```{r}
-c_nn = finalPrediction("C", best_c$featexp_avNNet)[3:4]
-c_bayes = finalPrediction("C", best_c$featexp_bayes)[3:4]
-c_log = finalPrediction("C", best_c$featexp_logistic)[3:4]
-c_rf = finalPrediction("C", best_c$featexp_rf)[3:4]
-c_xgb = finalPrediction("C", best_c$featexp_xboost)[3:4]
+c_nn = finalPrediction("C", best_c$featexp_avNNet)
+c_bayes = finalPrediction("C", best_c$featexp_bayes)
+c_log = finalPrediction("C", best_c$featexp_logistic)
+c_rf = finalPrediction("C", best_c$featexp_rf)
+c_xgb = finalPrediction("C", best_c$featexp_xboost)
 
-average_prediction_c = data.frame(Model=c("avNNet", "Naive Bayes", "Penalized Logistic Regression", "Random Forest", "XGBoost"))
-overall = as.data.frame(rbind(c_nn$overall, c_bayes$overall, c_log$overall, c_rf$overall, c_xgb$overall))
-byclass = as.data.frame(rbind(c_nn$byClass, c_bayes$byClass, c_log$byClass, c_rf$byClass, c_xgb$byClass))
-
-average_prediction_c = cbind(average_prediction_c, overall, byclass)
-average_prediction_c = average_prediction_c[,c(-4:-8, -11:-19)]
+average_prediction_c = rbind(c_nn, c_bayes, c_log, c_rf, c_xgb)
+average_prediction_c$Model = c("avNNet", "Naive Bayes", "Penalized Logistic Regression", "Random Forest", "XGBoost")
 
 write.csv(average_prediction_c, "Model_evaluation/Averaged_prediction_coordination.csv", row.names = F)
 ```
@@ -172,6 +171,8 @@ model_comparison
 
 write.csv(model_comparison, "Model_evaluation/Coordination_vs_participant.csv", row.names = F)
 ```
+
+Result - no increase in performance over time
 
 # Prediction understanding with DALEX
 

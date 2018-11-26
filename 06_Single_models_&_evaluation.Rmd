@@ -618,12 +618,57 @@ library(corrplot)
 corrplot(correlation_p, type = "upper", method = "color", addCoef.col = "black", tl.col = "black", tl.srt = 30)
 
 corrplot(correlation_c, type = "upper", method = "color", addCoef.col = "black", tl.col = "black", tl.srt = 30)
+
+#prediction correlation
+p_data = caret_friendly(read.csv("clean_data/ML_data/Participant_boruta.csv"))
+c_data = caret_friendly(read.csv("clean_data/ML_data/Coordination_featexp.csv"))
+
+p_predictions = data.frame()
+for (i in 1:length(best_participant)) {
+  model = best_participant[[i]]
+  name = model$method
+  one_pred = as.data.frame(predict(model, p_data$X_test, type="prob")[,1])
+  one_pred$model = name
+  one_pred$n = 1:nrow(one_pred)
+  p_predictions = rbind(p_predictions, one_pred)
+}
+
+c_predictions = data.frame()
+for (i in 1:length(best_coordination)) {
+  model = best_coordination[[i]]
+  name = model$method
+  one_pred = as.data.frame(predict(model, c_data$X_test, type="prob")[,1])
+  one_pred$model = name
+  one_pred$n = 1:nrow(one_pred)
+  c_predictions = rbind(c_predictions, one_pred)
+}
+
+colnames(p_predictions)[1]="prob"
+colnames(c_predictions)[1]="prob"
+
+p_wide = data.frame(avNNet=p_predictions[p_predictions$model=="avNNet",1],
+                    naive_bayes=p_predictions[p_predictions$model=="naive_bayes",1],
+                    plr=p_predictions[p_predictions$model=="plr",1],
+                    rf=p_predictions[p_predictions$model=="rf",1],
+                    xgbTree=p_predictions[p_predictions$model=="xgbTree",1])
+c_wide = data.frame(avNNet=c_predictions[c_predictions$model=="avNNet",1],
+                    naive_bayes=c_predictions[c_predictions$model=="naive_bayes",1],
+                    plr=c_predictions[c_predictions$model=="plr",1],
+                    rf=c_predictions[c_predictions$model=="rf",1],
+                    xgbTree=c_predictions[c_predictions$model=="xgbTree",1])
+
+cor_matrix_p = cor(p_wide)
+cor_matrix_c = cor(c_wide)
+
+
+library(corrplot)
+corrplot(cor_matrix_p, method = "color", addCoef.col = "black", tl.col = "black", tl.srt = 30)
+corrplot(cor_matrix_c, method = "color", addCoef.col = "black", tl.col = "black", tl.srt = 30)
 ```
 
 Both sets of model show high levels of correlation. Building an ensemble probably won't see a significant increase in performance.
 
-
-
+Let's try it anyway
 To train an ensemble we need to fit a model list: list of models fitted on the same CV folds in the same order.
 
 Load data and CV indexes
@@ -654,6 +699,12 @@ model_list_p <- caretList(
   methodList=c("gbm")
   )
 
+model_list_p[["avNNet"]]=best_participant$avNNet
+model_list_p[["naive_bayes"]]=best_participant$NB
+model_list_p[["plr"]]=best_participant$PLR
+model_list_p[["rf"]]=best_participant$RF
+model_list_p[["xgbTree"]]=best_participant$XGB
+
 fitControl = trainControl(
   method = "repeatedcv",
   number = 10,
@@ -671,7 +722,14 @@ model_list_c <- caretList(
   methodList=c("gbm")
   )
 
+model_list_c[["avNNet"]]=best_coordination$avNNet
+model_list_c[["naive_bayes"]]=best_coordination$NB
+model_list_c[["plr"]]=best_coordination$PLR
+model_list_c[["rf"]]=best_coordination$RF
+model_list_c[["xgbTree"]]=best_coordination$XGB
+
 saveRDS(model_list_p, "Models/Participant_list.rds")
+saveRDS(model_list_c, "Models/Coordination_list.rds")
 ```
 
 

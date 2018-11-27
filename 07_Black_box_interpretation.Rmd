@@ -176,5 +176,60 @@ Result - no increase in performance over time
 
 # Prediction understanding with DALEX
 
-It doesn't make sense to try to interpret the participant models because their performance on the test data isn't significantly higher than no-information rate.
+It doesn't make sense to try to interpret the participant models because their performance on the test data much higher than random guess.
+
+## Coordination models interpretation
+We'll look inside of all 5 models. Compare the decision patterns. Maybe also residuals.
+
+Import libraries, models and testing data.
+```{r}
+library(DALEX)
+library(caret)
+library(breakDown)
+source("Scripts/modelling_fuctions.R")
+
+models = load_models("C")
+models = models[(startsWith(names(models), "featexp"))]
+data = read.csv("clean_data/ML_data/Coordination_featexp.csv")
+data = subset(data, set=="test")
+data = data[,c(-1, -3:-5)]
+```
+
+```{r}
+p_fun <- function(object, newdata){
+  predict(object, newdata=newdata, type="prob")[,1]
+}
+
+data$diagnosis = ifelse(data$diagnosis=="Control", 0, 1)
+
+#create explainers
+expl_nn = explain(models$featexp_avNNet, y=data[,1], data=data[,-1], predict_function = p_fun, label = "avNNet")
+expl_bayes = explain(models$featexp_bayes, y=data[,1], data=data[,-1], predict_function = p_fun, label = "Naive Bayes")
+expl_log = explain(models$featexp_logistic, y=data[,1], data=data[,-1], predict_function = p_fun, label = "Penalized Logistic Regression")
+expl_rf = explain(models$featexp_rf, y=data[,1], data=data[,-1], predict_function = p_fun, label = "Random Forest")
+expl_xgb = explain(models$featexp_xboost, y=data[,1], data=data[,-1], predict_function = p_fun, label = "XGBoost")
+
+#calculate residuals - difference between prediction and true value
+performance_nn = model_performance(expl_nn)
+performance_bayes = model_performance(expl_bayes)
+performance_log = model_performance(expl_log)
+performance_rf = model_performance(expl_rf)
+performance_xgb = model_performance(expl_xgb)
+
+residual_distribution = plot(performance_nn, 
+     performance_bayes, 
+     performance_log, 
+     performance_rf, 
+     performance_xgb)
+residual_distribution
+
+#feature permutation
+importance_nn = variable_importance(expl_nn, loss_function = loss_root_mean_square)
+importance_bayes = variable_importance(expl_bayes, loss_function = loss_root_mean_square)
+
+plot(importance_bayes)
+
+
+resp = variable_response(expl, variable = "mad_diff")
+```
 

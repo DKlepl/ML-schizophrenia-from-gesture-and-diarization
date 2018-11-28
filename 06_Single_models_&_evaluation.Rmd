@@ -787,18 +787,4 @@ imp_b = variable_importance(expl_b, loss_function = loss_root_mean_square)
 plot(imp_a, imp_b)
 ```
 
-p_fun <- function(object, newdata){predict(object, newdata=newdata, type="prob")[,1]}
-d2$diagnosis = ifelse(d2$diagnosis=="Control", 0, 1)
-expl = explain(m2, d2[,-1], d2$diagnosis, predict_function = p_fun)
-perf = model_performance(expl)
-imp = variable_importance(expl, loss_function = loss_root_mean_square)
-plot(perf)
-
-plot(imp)
-
-resp = variable_response(expl, variable = "mad_diff")
-plot(resp)
-
-p = predict(m2, newdata=d2[,-1], type="prob")
-
 

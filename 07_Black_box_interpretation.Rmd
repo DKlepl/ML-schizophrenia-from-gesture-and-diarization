@@ -7,7 +7,7 @@ output: html_document
 
 # Import functions
 ```{r}
-pacman::p_load("caret", "DALEX", "tidyverse", "pROC")
+pacman::p_load("caret", "DALEX", "tidyverse", "pROC", "grid", "gridExtra")
 source("Scripts/modelling_fuctions.R")
 ```
 
@@ -30,6 +30,7 @@ rm(c_models)
 ```
 
 Hypothesis HOLDS!!!
+
 ```{r}
 model_test_p = data.frame()
 for (i in 1:length(best_p)) {
@@ -58,6 +59,39 @@ for (i in 1:length(best_c)) {
 
 write.csv(model_test_p, "Model_evaluation/Test_performance_participant.csv", row.names = F)
 write.csv(model_test_c, "Model_evaluation/Test_performance_coordination.csv", row.names = F)
+
+results_all = rbind(model_test_p, model_test_c)
+results_all$set = c(rep("Participant", 5), rep("Coordination", 5))
+
+auc_test = ggplot(results_all, aes(x=model, y=auc, color=set))+
+  geom_point(size=5)+
+  theme_few()+
+  scale_color_few()+
+  labs(y="AUC", x=NULL)+
+  guides(color=F)
+auc_test
+
+sens_test = ggplot(results_all, aes(x=model, y=Sensitivity, color=set))+
+  geom_point(size=5)+
+  theme_few()+
+  scale_color_few()+
+  labs(y="Sensitivity", x=NULL)+
+  guides(color=F)
+sens_test
+
+spec_test = ggplot(results_all, aes(x=model, y=Specificity, color=set))+
+  geom_point(size=5)+
+  theme_few()+
+  scale_color_few()+
+  labs(y="Specificity", x=NULL)
+spec_test
+
+ggsave("Model_evaluation/AUC_validation.jpg", auc_test, width = 7, height = 3)
+
+
+performance_all = grid.arrange(auc_test, sens_test, spec_test, top=textGrob("Performance of top 10 models on validation data", gp=gpar(fontsize=12, font=3)))
+
+ggsave("Model_evaluation/Validation_performance.jpg", performance_all, width = 7, height = 5)
 ```
     
 # How accurate is the model if all samples from one participant are merged into one final prediction
@@ -199,7 +233,7 @@ data = data[,c(-1, -3:-5)]
 ### Create model explainers
 ```{r}
 p_fun <- function(object, newdata){
-  predict(object, newdata=newdata, type="prob")[,1]
+  predict(object, newdata=newdata, type="prob")[,2]
 }
 
 #DAlEX requires the target to be numeric
@@ -276,17 +310,20 @@ ggsave("Model_interpretation/Feature_importance.jpg", imp_plot, width = 10, heig
 IQR diff
 ```{r}
 #important in avnnet, bayes and plr
-resp1_nn = variable_response(expl_nn, variable = "iqr_diff")
-resp1_bayes = variable_response(expl_bayes, variable = "iqr_diff")
-resp1_log = variable_response(expl_log, variable = "iqr_diff")
-resp1_rf = variable_response(expl_rf, variable = "iqr_diff")
-resp1_xgb = variable_response(expl_xgb, variable = "iqr_diff")
+resp1_nn = variable_response(expl_nn, variable = "iqr_diff", type="ale", prob=T)
+resp1_bayes = variable_response(expl_bayes, variable = "iqr_diff",type = "ale")
+resp1_log = variable_response(expl_log, variable = "iqr_diff",type = "ale")
+resp1_rf = variable_response(expl_rf, variable = "iqr_diff",type = "ale")
+resp1_xgb = variable_response(expl_xgb, variable = "iqr_diff",type = "ale")
 
 plot_iqr = plot(resp1_nn, resp1_bayes, resp1_log, resp1_rf, resp1_xgb)+
   theme_few()+
   guides(shape=F)+
-  labs(title = "PDP of iqr_diff")
+  labs(title = "ALE of iqr_diff")
 plot_iqr
+
+
+plot(single_prediction(expl_bayes, data[54,], direction="up"))
 
 ggsave("Model_interpretation/IQR_pdp.jpg", plot_iqr, width = 7, height = 4)
 ```
@@ -294,17 +331,17 @@ ggsave("Model_interpretation/IQR_pdp.jpg", plot_iqr, width = 7, height = 4)
 sum diff
 ```{r}
 #important for avnnet, 
-resp2_nn = variable_response(expl_nn, variable = "sum_diff")
-resp2_bayes = variable_response(expl_bayes, variable = "sum_diff")
-resp2_log = variable_response(expl_log, variable = "sum_diff")
-resp2_rf = variable_response(expl_rf, variable = "sum_diff")
-resp2_xgb = variable_response(expl_xgb, variable = "sum_diff")
+resp2_nn = variable_response(expl_nn, variable = "sum_diff", type="ale")
+resp2_bayes = variable_response(expl_bayes, variable = "sum_diff", type="ale")
+resp2_log = variable_response(expl_log, variable = "sum_diff", type="ale")
+resp2_rf = variable_response(expl_rf, variable = "sum_diff", type="ale")
+resp2_xgb = variable_response(expl_xgb, variable = "sum_diff", type="ale")
 
 
 plot_sum = plot(resp2_nn, resp2_bayes, resp2_log, resp2_rf, resp2_xgb)+
   theme_few()+
   guides(shape=F)+
-  labs(title = "PDP of sum_diff")
+  labs(title = "ALE of sum_diff")
 plot_sum
 
 ggsave("Model_interpretation/sum_pdp.jpg", plot_sum, width = 7, height = 4)
@@ -313,17 +350,17 @@ ggsave("Model_interpretation/sum_pdp.jpg", plot_sum, width = 7, height = 4)
 median_diff
 ```{r}
 #important for avnnet, 
-resp3_nn = variable_response(expl_nn, variable = "median_diff")
-resp3_bayes = variable_response(expl_bayes, variable = "median_diff")
-resp3_log = variable_response(expl_log, variable = "median_diff")
-resp3_rf = variable_response(expl_rf, variable = "median_diff")
-resp3_xgb = variable_response(expl_xgb, variable = "median_diff")
+resp3_nn = variable_response(expl_nn, variable = "median_diff", type="ale")
+resp3_bayes = variable_response(expl_bayes, variable = "median_diff", type="ale")
+resp3_log = variable_response(expl_log, variable = "median_diff", type="ale")
+resp3_rf = variable_response(expl_rf, variable = "median_diff", type="ale")
+resp3_xgb = variable_response(expl_xgb, variable = "median_diff", type="ale")
 
 
 plot_median = plot(resp3_nn, resp3_bayes, resp3_log, resp3_rf, resp3_xgb)+
   theme_few()+
   guides(shape=F)+
-  labs(title = "PDP of median_diff")
+  labs(title = "ALE of median_diff")
 plot_median
 
 ggsave("Model_interpretation/median_pdp.jpg", plot_median, width = 7, height = 4)
@@ -332,17 +369,17 @@ ggsave("Model_interpretation/median_pdp.jpg", plot_median, width = 7, height = 4
 maxL
 ```{r}
 #important for avnnet, 
-resp4_nn = variable_response(expl_nn, variable = "maxL")
-resp4_bayes = variable_response(expl_bayes, variable = "maxL")
-resp4_log = variable_response(expl_log, variable = "maxL")
-resp4_rf = variable_response(expl_rf, variable = "maxL")
-resp4_xgb = variable_response(expl_xgb, variable = "maxL")
+resp4_nn = variable_response(expl_nn, variable = "maxL", type="ale")
+resp4_bayes = variable_response(expl_bayes, variable = "maxL", type="ale")
+resp4_log = variable_response(expl_log, variable = "maxL", type="ale")
+resp4_rf = variable_response(expl_rf, variable = "maxL", type="ale")
+resp4_xgb = variable_response(expl_xgb, variable = "maxL", type="ale")
 
 
 plot_maxL = plot(resp4_nn, resp4_bayes, resp4_log, resp4_rf, resp4_xgb)+
   theme_few()+
   guides(shape=F)+
-  labs(title = "PDP of maxL")
+  labs(title = "ALE of maxL")
 plot_maxL
 
 ggsave("Model_interpretation/maxL_pdp.jpg", plot_maxL, width = 7, height = 4)
@@ -351,17 +388,17 @@ ggsave("Model_interpretation/maxL_pdp.jpg", plot_maxL, width = 7, height = 4)
 mad_diff
 ```{r}
 #important for avnnet, 
-resp5_nn = variable_response(expl_nn, variable = "mad_diff")
-resp5_bayes = variable_response(expl_bayes, variable = "mad_diff")
-resp5_log = variable_response(expl_log, variable = "mad_diff")
-resp5_rf = variable_response(expl_rf, variable = "mad_diff")
-resp5_xgb = variable_response(expl_xgb, variable = "mad_diff")
+resp5_nn = variable_response(expl_nn, variable = "mad_diff", type="ale")
+resp5_bayes = variable_response(expl_bayes, variable = "mad_diff", type="ale")
+resp5_log = variable_response(expl_log, variable = "mad_diff", type="ale")
+resp5_rf = variable_response(expl_rf, variable = "mad_diff", type="ale")
+resp5_xgb = variable_response(expl_xgb, variable = "mad_diff", type="ale")
 
 
 plot_mad = plot(resp5_nn, resp5_bayes, resp5_log, resp5_rf, resp5_xgb)+
   theme_few()+
   guides(shape=F)+
-  labs(title = "PDP of mad_diff")
+  labs(title = "ALE of mad_diff")
 plot_mad
 
 ggsave("Model_interpretation/mad_pdp.jpg", plot_mad, width = 7, height = 4)
@@ -370,17 +407,17 @@ ggsave("Model_interpretation/mad_pdp.jpg", plot_mad, width = 7, height = 4)
 LAM_diff
 ```{r}
 #important for avnnet, 
-resp6_nn = variable_response(expl_nn, variable = "LAM_diff")
-resp6_bayes = variable_response(expl_bayes, variable = "LAM_diff")
-resp6_log = variable_response(expl_log, variable = "LAM_diff")
-resp6_rf = variable_response(expl_rf, variable = "LAM_diff")
-resp6_xgb = variable_response(expl_xgb, variable = "LAM_diff")
+resp6_nn = variable_response(expl_nn, variable = "LAM_diff", type="ale")
+resp6_bayes = variable_response(expl_bayes, variable = "LAM_diff", type="ale")
+resp6_log = variable_response(expl_log, variable = "LAM_diff", type="ale")
+resp6_rf = variable_response(expl_rf, variable = "LAM_diff", type="ale")
+resp6_xgb = variable_response(expl_xgb, variable = "LAM_diff", type="ale")
 
 
 plot_LAM = plot(resp6_nn, resp6_bayes, resp6_log, resp6_rf, resp6_xgb)+
   theme_few()+
   guides(shape=F)+
-  labs(title = "PDP of LAM_diff")
+  labs(title = "ALE of LAM_diff")
 plot_LAM
 
 ggsave("Model_interpretation/LAM_pdp.jpg", plot_LAM, width = 7, height = 4)
@@ -389,17 +426,17 @@ ggsave("Model_interpretation/LAM_pdp.jpg", plot_LAM, width = 7, height = 4)
 var_diff
 ```{r}
 #important for avnnet, 
-resp7_nn = variable_response(expl_nn, variable = "var_diff")
-resp7_bayes = variable_response(expl_bayes, variable = "var_diff")
-resp7_log = variable_response(expl_log, variable = "var_diff")
-resp7_rf = variable_response(expl_rf, variable = "var_diff")
-resp7_xgb = variable_response(expl_xgb, variable = "var_diff")
+resp7_nn = variable_response(expl_nn, variable = "var_diff", type="ale")
+resp7_bayes = variable_response(expl_bayes, variable = "var_diff", type="ale")
+resp7_log = variable_response(expl_log, variable = "var_diff", type="ale")
+resp7_rf = variable_response(expl_rf, variable = "var_diff", type="ale")
+resp7_xgb = variable_response(expl_xgb, variable = "var_diff", type="ale")
 
 
 plot_var = plot(resp7_nn, resp7_bayes, resp7_log, resp7_rf, resp7_xgb)+
   theme_few()+
   guides(shape=F)+
-  labs(title = "PDP of var_diff")
+  labs(title = "ALE of var_diff")
 plot_var
 
 ggsave("Model_interpretation/var_pdp.jpg", plot_var, width = 7, height = 4)
@@ -407,17 +444,17 @@ ggsave("Model_interpretation/var_pdp.jpg", plot_var, width = 7, height = 4)
 
 max_diff
 ```{r}
-resp8_nn = variable_response(expl_nn, variable = "max_diff")
-resp8_bayes = variable_response(expl_bayes, variable = "max_diff")
-resp8_log = variable_response(expl_log, variable = "max_diff")
-resp8_rf = variable_response(expl_rf, variable = "max_diff")
-resp8_xgb = variable_response(expl_xgb, variable = "max_diff")
+resp8_nn = variable_response(expl_nn, variable = "max_diff", type="ale")
+resp8_bayes = variable_response(expl_bayes, variable = "max_diff", type="ale")
+resp8_log = variable_response(expl_log, variable = "max_diff", type="ale")
+resp8_rf = variable_response(expl_rf, variable = "max_diff", type="ale")
+resp8_xgb = variable_response(expl_xgb, variable = "max_diff", type="ale")
 
 
 plot_max = plot(resp8_nn, resp8_bayes, resp8_log, resp8_rf, resp8_xgb)+
   theme_few()+
   guides(shape=F)+
-  labs(title = "PDP of max_diff")
+  labs(title = "ALE of max_diff")
 plot_max
 
 ggsave("Model_interpretation/max_pdp.jpg", plot_max, width = 8, height = 4)
@@ -426,17 +463,17 @@ ggsave("Model_interpretation/max_pdp.jpg", plot_max, width = 8, height = 4)
 
 range_diff
 ```{r}
-resp9_nn = variable_response(expl_nn, variable = "range_diff")
-resp9_bayes = variable_response(expl_bayes, variable = "range_diff")
-resp9_log = variable_response(expl_log, variable = "range_diff")
-resp9_rf = variable_response(expl_rf, variable = "range_diff")
-resp9_xgb = variable_response(expl_xgb, variable = "range_diff")
+resp9_nn = variable_response(expl_nn, variable = "range_diff", type="ale")
+resp9_bayes = variable_response(expl_bayes, variable = "range_diff", type="ale")
+resp9_log = variable_response(expl_log, variable = "range_diff", type="ale")
+resp9_rf = variable_response(expl_rf, variable = "range_diff", type="ale")
+resp9_xgb = variable_response(expl_xgb, variable = "range_diff", type="ale")
 
 
 plot_range = plot(resp9_nn, resp9_bayes, resp9_log, resp9_rf, resp9_xgb)+
   theme_few()+
   guides(shape=F)+
-  labs(title = "PDP of range_diff")
+  labs(title = "ALE of range_diff")
 plot_range
 
 ggsave("Model_interpretation/range_pdp.jpg", plot_range, width = 8, height = 4)
@@ -444,17 +481,17 @@ ggsave("Model_interpretation/range_pdp.jpg", plot_range, width = 8, height = 4)
 
 sd_diff
 ```{r}
-resp10_nn = variable_response(expl_nn, variable = "sd_diff")
-resp10_bayes = variable_response(expl_bayes, variable = "sd_diff")
-resp10_log = variable_response(expl_log, variable = "sd_diff")
-resp10_rf = variable_response(expl_rf, variable = "sd_diff")
-resp10_xgb = variable_response(expl_xgb, variable = "sd_diff")
+resp10_nn = variable_response(expl_nn, variable = "sd_diff", type="ale")
+resp10_bayes = variable_response(expl_bayes, variable = "sd_diff", type="ale")
+resp10_log = variable_response(expl_log, variable = "sd_diff", type="ale")
+resp10_rf = variable_response(expl_rf, variable = "sd_diff", type="ale")
+resp10_xgb = variable_response(expl_xgb, variable = "sd_diff", type="ale")
 
 
 plot_sd = plot(resp10_nn, resp10_bayes, resp10_log, resp10_rf, resp10_xgb)+
   theme_few()+
   guides(shape=F)+
-  labs(title = "PDP of sd_diff")
+  labs(title = "ALE of sd_diff")
 plot_sd
 
 ggsave("Model_interpretation/sd_pdp.jpg", plot_sd, width = 8, height = 4)

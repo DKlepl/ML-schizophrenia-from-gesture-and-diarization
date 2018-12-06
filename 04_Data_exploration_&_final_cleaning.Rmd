@@ -11,7 +11,7 @@ Some filtering and transformation of the data is needed first.
 
 Here are all the ML ready data.
 ```{r}
-library(lme4)
+library(lmerTest)
 library(tidyverse)
 library(ggthemes)
 library(caret)
@@ -71,6 +71,14 @@ data_i = read.csv("clean_data/ML_ready/interviewer_data_enhanced.csv")
 data_p = read.csv("clean_data/ML_ready/participant_data_enhanced.csv")
 ```
 
+save names of all extracted features
+```{r}
+features_c = colnames(data_c)
+features_p = colnames(data_p)
+  
+write.csv(features_c, "Tables/Coordination_features.csv", row.names = F)      
+write.csv(features_p, "Tables/Participant_features.csv", row.names = F) 
+```
 
 # Final data processing
 Before making any machine learning, the data needs to be treated for missing values, corrupt data-splits (where the actigraphs were not picking up almost any signal) and remove duplicate feature columns and columns that don't include any ML usable information.
@@ -233,6 +241,9 @@ colnames(data_p[,remove_p])
 data_c = data_c[,-remove_c]
 data_i = data_i[,-remove_i]
 data_p = data_p[,-remove_p]
+
+colnames(data_p)[remove_p]
+colnames(data_c)[remove_c]
 ```
 
 # Train-test split

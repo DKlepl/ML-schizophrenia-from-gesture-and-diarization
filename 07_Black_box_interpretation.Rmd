@@ -7,7 +7,7 @@ output: html_document
 
 # Import functions
 ```{r}
-pacman::p_load("caret", "DALEX", "tidyverse", "pROC", "grid", "gridExtra")
+pacman::p_load("caret", "DALEX", "tidyverse", "pROC", "grid", "gridExtra", "ggthemes")
 source("Scripts/modelling_fuctions.R")
 ```
 
@@ -98,7 +98,37 @@ ggsave("Model_evaluation/Validation_performance.jpg", performance_all, width = 7
 
 Better make this into a function
 ```{r}
-finalPrediction = function (which = c("C", "P"), model) {
+finalPrediction_noweights = function (which = c("C", "P"), model) {
+  if (which == "C") {data = c_data}
+  if (which == "P") {data = p_data}
+  
+  predictions = predict(model, data$X_test, type = "prob")
+  predictions$ID = subset(data$no_model, set=="test")$ID
+  predictions$diagnosis = data$Y_test
+  predictions$diagnosis = ifelse(predictions$diagnosis=="Control", 0, 1)
+  predictions$time = subset(data$no_model, set=="test")$time
+  
+  sum_pred = predictions %>% group_by(ID) %>% summarise(n_samples = n(), Schizophrenic=mean(x=Schizophrenic), diagnosis=mean(diagnosis))
+  auc = auc(sum_pred$diagnosis, sum_pred$Schizophrenic)
+  
+  sum_pred$decision_s = ifelse(sum_pred$Schizophrenic>=0.5, "Schizophrenic", "Control")
+  sum_pred$diagnosis = ifelse(sum_pred$diagnosis==1, "Schizophrenic", "Control")
+  
+  sum_pred$decision_s = as.factor(sum_pred$decision_s)
+  sum_pred$diagnosis = as.factor(sum_pred$diagnosis)
+  
+  
+  cM = confusionMatrix(data=sum_pred$decision_s, reference = sum_pred$diagnosis, positive = "Schizophrenic")
+  
+  overall = as.data.frame(rbind(cM$overall))
+  byclass = as.data.frame(rbind(cM$byClass))
+  
+  perf = cbind(auc, overall, byclass)
+  
+  return(perf)
+}
+
+finalPrediction_weights = function (which = c("C", "P"), model) {
   if (which == "C") {data = c_data}
   if (which == "P") {data = p_data}
   
@@ -130,32 +160,62 @@ finalPrediction = function (which = c("C", "P"), model) {
 ```
 
 
-For participant model - NO information rate = 0.5
+No weights mean
 ```{r}
-p_nn = finalPrediction("P", best_p$boruta_avNNet)
-p_bayes = finalPrediction("P", best_p$boruta_bayes)
-p_log = finalPrediction("P", best_p$boruta_logistic)
-p_rf = finalPrediction("P", best_p$boruta_rf)
-p_xgb = finalPrediction("P", best_p$boruta_xboost)
+p_nn = finalPrediction_noweights("P", best_p$boruta_avNNet)
+p_bayes = finalPrediction_noweights("P", best_p$boruta_bayes)
+p_log = finalPrediction_noweights("P", best_p$boruta_logistic)
+p_rf = finalPrediction_noweights("P", best_p$boruta_rf)
+p_xgb = finalPrediction_noweights("P", best_p$boruta_xboost)
 
 average_prediction_p = rbind(p_nn, p_bayes, p_log, p_rf, p_xgb)
 average_prediction_p$Model = c("avNNet", "Naive Bayes", "Penalized Logistic Regression", "Random Forest", "XGBoost")
+average_prediction_p$set = "PD"
 
-write.csv(average_prediction_p, "Model_evaluation/Averaged_prediction_participant.csv", row.names = F)
-```
-
-Coordination model - No information rate = 0.5
-```{r}
-c_nn = finalPrediction("C", best_c$featexp_avNNet)
-c_bayes = finalPrediction("C", best_c$featexp_bayes)
-c_log = finalPrediction("C", best_c$featexp_logistic)
-c_rf = finalPrediction("C", best_c$featexp_rf)
-c_xgb = finalPrediction("C", best_c$featexp_xboost)
+c_nn = finalPrediction_noweights("C", best_c$featexp_avNNet)
+c_bayes = finalPrediction_noweights("C", best_c$featexp_bayes)
+c_log = finalPrediction_noweights("C", best_c$featexp_logistic)
+c_rf = finalPrediction_noweights("C", best_c$featexp_rf)
+c_xgb = finalPrediction_noweights("C", best_c$featexp_xboost)
 
 average_prediction_c = rbind(c_nn, c_bayes, c_log, c_rf, c_xgb)
 average_prediction_c$Model = c("avNNet", "Naive Bayes", "Penalized Logistic Regression", "Random Forest", "XGBoost")
 
-write.csv(average_prediction_c, "Model_evaluation/Averaged_prediction_coordination.csv", row.names = F)
+average_prediction_c$set = "CD"
+
+average_prediction_mean = rbind(average_prediction_p, average_prediction_c)
+average_prediction_mean[,1:19] = round(average_prediction_mean[,1:19], 3)
+
+write.csv(average_prediction_mean, "Model_evaluation/Average_prediction_noweights.csv", row.names = F)
+```
+
+Weighted with time
+```{r}
+p_nn = finalPrediction_weights("P", best_p$boruta_avNNet)
+p_bayes = finalPrediction_weights("P", best_p$boruta_bayes)
+p_log = finalPrediction_weights("P", best_p$boruta_logistic)
+p_rf = finalPrediction_weights("P", best_p$boruta_rf)
+p_xgb = finalPrediction_weights("P", best_p$boruta_xboost)
+
+average_prediction_p = rbind(p_nn, p_bayes, p_log, p_rf, p_xgb)
+average_prediction_p$Model = c("avNNet", "Naive Bayes", "Penalized Logistic Regression", "Random Forest", "XGBoost")
+average_prediction_p$set = "PD"
+
+c_nn = finalPrediction_weights("C", best_c$featexp_avNNet)
+c_bayes = finalPrediction_weights("C", best_c$featexp_bayes)
+c_log = finalPrediction_weights("C", best_c$featexp_logistic)
+c_rf = finalPrediction_weights("C", best_c$featexp_rf)
+c_xgb = finalPrediction_weights("C", best_c$featexp_xboost)
+
+average_prediction_c = rbind(c_nn, c_bayes, c_log, c_rf, c_xgb)
+average_prediction_c$Model = c("avNNet", "Naive Bayes", "Penalized Logistic Regression", "Random Forest", "XGBoost")
+
+average_prediction_c$set = "CD"
+
+average_prediction_weighted = rbind(average_prediction_p, average_prediction_c)
+average_prediction_weighted[,1:19] = round(average_prediction_weighted[,1:19], 3)
+
+write.csv(average_prediction_weighted, "Model_evaluation/Average_prediction_weighted.csv", row.names = F)
 ```
 
 These results indicate that accuracy may be increasing in samples taken from later in the interview.
@@ -165,7 +225,7 @@ Hypothesis:
     - in participant - NO
     - in coordination - YES, coordination systems emerge over time
 
-
+Use best participant model and the worst coordination model to get stronger evidence of main hypothesis
 ```{r}
 results_c = data.frame(ID = subset(c_data$no_model, set=="test")$ID,
                        diagnosis = c_data$Y_test,
@@ -174,8 +234,8 @@ results_p = data.frame(ID = subset(p_data$no_model, set=="test")$ID,
                        diagnosis = p_data$Y_test,
                        time = subset(p_data$no_model, set=="test")$time)
 
-prediction_c = predict(best_c$featexp_bayes, c_data$X_test, type = "prob")
-prediction_p = predict(best_p$boruta_bayes, p_data$X_test, type = "prob")
+prediction_c = predict(best_c$featexp_xboost, c_data$X_test, type = "prob")
+prediction_p = predict(best_p$boruta_xboost, p_data$X_test, type = "prob")
 
 results_c = cbind(results_c, prediction_c)
 results_p = cbind(results_p ,prediction_p)
@@ -186,24 +246,34 @@ results_c$rmse = ifelse(results_c$diagnosis==0, 1-results_c$Control, 1-results_c
 results_p$diagnosis = ifelse(results_p$diagnosis=="Control", 0, 1)
 results_p$rmse = ifelse(results_p$diagnosis==0, 1-results_p$Control, 1-results_p$Schizophrenic)
 
-results_c$model = "coordination"
-results_p$model = "participant"
+results_c$set = "coordination"
+results_p$set = "participant"
 
 results = rbind(results_c, results_p)
+results$model = "xgb"
+
+results_all = rbind(results_all, results)
+
+#test participant model
+time_participant = lmer(rmse ~ time +(1|ID), results_p)
+time_coordination = lmer(rmse ~ time +(1|ID), results_c)
+
+summary(time_participant)
+summary(time_coordination)
 
 library(lmerTest)
-acc_time = lmer(rmse ~ time + model +(1|ID), results)
-acc_model = lmer(rmse ~ model +(1|ID), results)
+acc_model = lmer(rmse ~ set +(1|ID), results_all)
 
-summary(acc_time)
 summary(acc_model)
 
+
+
 #acc_time model shows both better performance of coordination model and that there is no significant change in performance over time
-model_comparison = summary(acc_time)
+model_comparison = summary(acc_model)
 model_comparison = round(model_comparison$coefficients,3)
 model_comparison
 
-write.csv(model_comparison, "Model_evaluation/Coordination_vs_participant.csv", row.names = F)
+write.csv(model_comparison, "Model_evaluation/Coordination_vs_participant.csv")
 ```
 
 Result - no increase in performance over time
@@ -233,7 +303,7 @@ data = data[,c(-1, -3:-5)]
 ### Create model explainers
 ```{r}
 p_fun <- function(object, newdata){
-  predict(object, newdata=newdata, type="prob")[,2]
+  predict(object, newdata=newdata, type="prob")[,1]
 }
 
 #DAlEX requires the target to be numeric
@@ -262,10 +332,11 @@ residual_distribution = plot(performance_nn,
      performance_bayes, 
      performance_log, 
      performance_rf, 
-     performance_xgb)+
+     performance_xgb, geom = "boxplot", outliers=1)+
   theme_few()+
-  scale_color_few(name="Model")+
-  labs(title = "Distribution of residuals", x="Residuals")
+  scale_fill_few()+
+  labs(title = "Distribution of residuals", x="Residuals")+
+  guides(fill=F)
 
 residual_distribution
 
@@ -319,7 +390,8 @@ resp1_xgb = variable_response(expl_xgb, variable = "iqr_diff",type = "ale")
 plot_iqr = plot(resp1_nn, resp1_bayes, resp1_log, resp1_rf, resp1_xgb)+
   theme_few()+
   guides(shape=F)+
-  labs(title = "ALE of iqr_diff")
+  labs(title = "ALE of iqr_diff")+
+  scale_color_few()
 plot_iqr
 
 
@@ -495,5 +567,37 @@ plot_sd = plot(resp10_nn, resp10_bayes, resp10_log, resp10_rf, resp10_xgb)+
 plot_sd
 
 ggsave("Model_interpretation/sd_pdp.jpg", plot_sd, width = 8, height = 4)
+```
+
+## Single prediction breakdown
+```{r}
+rownames(data)=NULL
+pred = predict(models$featexp_avNNet, data, type = "prob")
+pred$true = data$diagnosis
+rownames(pred)=NULL
+
+#give example of 100% schizo and correct prediction
+schizo = data[358,]
+schizo[,2:11]=round(schizo[,2:11], 3)
+schizo_break = prediction_breakdown(expl_nn, schizo[,-1])
+S_break = plot(schizo_break)+
+  theme_few()+
+  guides(fill=F)+
+  labs(subtitle ="Diagnosis: Schizophrenia")
+ggsave("Model_interpretation/breakdown_patient.jpg", S_break)
+
+#example of definitely control
+ctrl = data[137,]
+ctrl[,2:11]=round(ctrl[,2:11], 3)
+ctrl_break = prediction_breakdown(expl_nn, ctrl[,-1])
+C_break = plot(ctrl_break)+
+  theme_few()+
+  guides(fill=F)+
+  labs(subtitle="Diagnosis: Healthy")
+
+library(gridExtra)
+library(grid)
+breakdown_both = grid.arrange(S_break, C_break, ncol=2, top=textGrob("Breakdown of predictions", gp=gpar(fontsize=10, font=3)))
+ggsave("Model_interpretation/Breakdown_example.jpg", breakdown_both, width = 8, height = 3)
 ```
 

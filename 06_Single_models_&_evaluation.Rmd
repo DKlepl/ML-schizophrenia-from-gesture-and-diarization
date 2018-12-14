@@ -7,7 +7,7 @@ output: html_document
 
 # Required libraries
 ```{r}
-pacman::p_load("caret", "DALEX", "caretEnsemble")
+pacman::p_load("caret", "DALEX", "caretEnsemble", "ggthemes")
 source("Scripts/modelling_fuctions.R")
 ```
 
@@ -537,7 +537,7 @@ roc_p = ggplot(roc_participant, aes(x=reorder(model, -mean), y=mean))+
   geom_errorbar(aes(ymin=(mean+sd), ymax=(mean-sd)))+
   theme_few()+
   theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 10, lineheight = 8))+
-  labs(x="Participant", y="Mean")
+  labs(x="Participant", y="Area under the curve")
 roc_p
 
 ggsave("Model_evaluation/ROC_participant.jpg", roc_p, width = 7, height = 4)
@@ -577,7 +577,7 @@ roc_c = ggplot(roc_coordination, aes(x=reorder(model, -mean), y=mean))+
   geom_errorbar(aes(ymin=(mean+sd), ymax=(mean-sd)))+
   theme_few()+
   theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 10, lineheight = 8))+
-  labs(x="Coordination", y="")
+  labs(x="Coordination", y=NULL)
 
 ggsave("Model_evaluation/ROC_coordination.jpg", roc_c, width = 7, height = 4)
 write.csv(roc_coordination, "Model_evaluation/ROC_coordination.csv", row.names = F)

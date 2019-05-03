@@ -1,0 +1,402 @@
+/******************* Timeline Demo - 9 *****************/
+
+.main-timeline9 {
+  position: relative;
+  &:after {
+    content: "";
+    display: block;
+    width: 100%;
+    clear: both;
+  }
+  &:before {
+    content: "";
+    display: block;
+    width: 100%;
+    clear: both;
+    content: "";
+    width: 3px;
+    height: 100%;
+    background: #fff;
+    position: absolute;
+    top: 0;
+    left: 50%;
+  }
+  .timeline {
+    width: 50%;
+    float: left;
+    position: relative;
+    z-index: 1;
+    &:after, &:before {
+      content: "";
+      display: block;
+      width: 100%;
+      clear: both;
+    }
+    &:first-child:before {
+      content: "";
+      width: 25px;
+      height: 25px;
+      border-radius: 50%;
+      background: #5AAC7B;
+      border: 4px solid #fff;
+      position: absolute;
+      top: 0;
+      right: -14px;
+      z-index: 1;
+    }
+    &:last-child {
+      &:before {
+        content: "";
+        width: 25px;
+        height: 25px;
+        border-radius: 50%;
+        background: #5AAC7B;
+        border: 4px solid #fff;
+        position: absolute;
+        top: 0;
+        right: -14px;
+        z-index: 1;
+        top: auto;
+        bottom: 0;
+      }
+      &:nth-child(even):before {
+        right: auto;
+        left: -12px;
+        bottom: -2px;
+      }
+    }
+  }
+  .timeline-content {
+    text-align: center;
+    margin-top: 8px;
+    position: relative;
+    transition: all 0.3s ease 0s;
+    &:before {
+      content: "";
+      width: 100%;
+      height: 5px;
+      background: #fff;
+      position: absolute;
+      top: 88px;
+      left: 0;
+      z-index: -1;
+    }
+  }
+  .circle {
+    width: 180px;
+    height: 180px;
+    border-radius: 50%;
+    background: #5AAC7B;
+    border: 8px solid #fff;
+    float: left;
+    margin-right: 25px;
+    position: relative;
+    span {
+      &:after, &:before {
+        content: "";
+        margin: auto;
+        position: absolute;
+        right: -33px;
+        bottom: 0;
+        z-index: -1;
+      }
+    }
+    &:before {
+      content: "";
+      margin: auto;
+      position: absolute;
+      right: -33px;
+      bottom: 0;
+      z-index: -1;
+      width: 26px;
+      height: 30px;
+      background: #fff;
+      top: 0;
+      box-shadow: inset 7px 0 9px -7px #000;
+    }
+    span {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      line-height: 160px;
+      border: 3px solid #adabab;
+      font-size: 80px;
+      color: #fff;
+      &:after, &:before {
+        width: 28px;
+        height: 50px;
+        background: #5AAC7B;
+        border-radius: 0 0 0 21px;
+        top: -54px;
+      }
+      &:after {
+        border-radius: 21px 0 0;
+        top: 0;
+        bottom: -56px;
+      }
+    }
+  }
+  .content {
+    display: table;
+    padding-right: 40px;
+    position: relative;
+  }
+  .year {
+    display: block;
+    padding: 10px;
+    margin: 10px 0 50px;
+    background: #fff;
+    border-radius: 7px;
+    font-size: 25px;
+    color: #5AAC7B;
+  }
+  .title {
+    font-size: 25px;
+    font-weight: 700;
+    color: #fff;
+    margin-top: 0;
+  }
+  .icon {
+    span {
+      &:after, &:before {
+        content: "";
+        height: 25px;
+        margin: auto;
+        position: absolute;
+        bottom: 0;
+        z-index: -1;
+        left: -15px;
+      }
+    }
+    &:before {
+      content: "";
+      height: 25px;
+      margin: auto;
+      position: absolute;
+      bottom: 0;
+      z-index: -1;
+      left: -15px;
+    }
+  }
+  .description {
+    font-size: 14px;
+    color: #fff;
+    text-align: justify;
+  }
+  .keywords {
+    font-size: 13px;
+    font-style: italic;
+    color: #E5E5E5;
+    text-align: center;
+    text-transform: uppercase;
+  }
+  .icon {
+    width: 25px;
+    height: 25px;
+    border-radius: 50%;
+    background: #5AAC7B;
+    border: 4px solid #fff;
+    position: absolute;
+    top: 78px;
+    right: -14px;
+    &:before {
+      width: 15px;
+      background: #fff;
+      top: -1px;
+    }
+    span {
+      &:after, &:before {
+        width: 21px;
+        background: #5AAC7B;
+        border-radius: 0 0 21px;
+        top: -30px;
+      }
+      &:after {
+        border-radius: 0 21px 0 0;
+        top: 0;
+        left: -15px;
+        bottom: -30px;
+      }
+    }
+  }
+  .timeline {
+    &:nth-child(2n) {
+      .circle, .timeline-content {
+        float: right;
+      }
+      .circle {
+        margin: 0 0 0 25px;
+        &:before {
+          right: auto;
+          left: -33px;
+          box-shadow: -7px 0 9px -7px #444 inset;
+        }
+        span {
+          &:after, &:before {
+            right: auto;
+            left: -33px;
+            border-radius: 0 0 21px;
+          }
+          &:after {
+            border-radius: 0 21px 0 0;
+          }
+        }
+      }
+      .content {
+        padding: 0 0 0 40px;
+        margin-left: 2px;
+      }
+      .icon {
+        right: auto;
+        left: -14px;
+        span {
+          &:after, &:before {
+            left: auto;
+            right: -15px;
+          }
+        }
+        &:before {
+          left: auto;
+          right: -15px;
+        }
+        span {
+          &:before {
+            border-radius: 0 0 0 21px;
+          }
+          &:after {
+            border-radius: 21px 0 0;
+          }
+        }
+      }
+    }
+    &:nth-child(2) {
+      margin-top: 180px;
+    }
+    &:nth-child(odd) {
+      margin: -175px 0 0;
+    }
+    &:nth-child(even) {
+      margin-bottom: 80px;
+    }
+    &:first-child, &:last-child:nth-child(even) {
+      margin: 0;
+    }
+  }
+}
+
+@media only screen and (max-width: 990px) {
+  .main-timeline9 {
+    &:before {
+      left: 100%;
+    }
+    .timeline {
+      width: 100%;
+      float: none;
+      margin-bottom: 20px !important;
+      &:first-child:before, &:last-child:before {
+        left: auto !important;
+        right: -13px !important;
+      }
+      &:nth-child(2n) {
+        .circle {
+          float: left;
+          margin: 0 25px 0 0;
+          &:before {
+            right: -33px;
+            left: auto;
+            box-shadow: 7px 0 9px -7px #444 inset;
+          }
+          span {
+            &:after, &:before {
+              right: -33px;
+              left: auto;
+              border-radius: 0 0 0 21px;
+            }
+            &:after {
+              border-radius: 21px 0 0;
+            }
+          }
+        }
+        .content {
+          padding: 0 40px 0 0;
+          margin-left: 0;
+        }
+        .icon {
+          right: -14px;
+          left: auto;
+          span {
+            &:after, &:before {
+              left: -15px;
+              right: auto;
+            }
+          }
+          &:before {
+            left: -15px;
+            right: auto;
+          }
+          span {
+            &:before {
+              border-radius: 0 0 21px;
+            }
+            &:after {
+              border-radius: 0 21px 0 0;
+            }
+          }
+        }
+      }
+      &:nth-child(2), &:nth-child(even), &:nth-child(odd) {
+        margin: 0;
+      }
+    }
+  }
+}
+
+@media only screen and (max-width: 480px) {
+  .main-timeline9 {
+    &:before {
+      left: 0;
+    }
+    .timeline {
+      &:first-child:before, &:last-child:before {
+        left: -12px !important;
+        right: auto !important;
+      }
+    }
+    .circle, .timeline:nth-child(2n) .circle {
+      width: 130px;
+      height: 130px;
+      float: none;
+      margin: 0 auto;
+    }
+    .timeline-content:before {
+      width: 99.5%;
+      top: 68px;
+      left: 0.5%;
+    }
+    .circle {
+      span {
+        line-height: 115px;
+        font-size: 60px;
+        &:after, &:before {
+          display: none;
+        }
+      }
+      &:before {
+        display: none;
+      }
+    }
+    .icon {
+      display: none;
+    }
+    .content, .timeline:nth-child(2n) .content {
+      padding: 0 10px;
+    }
+    .year {
+      margin-bottom: 15px;
+    }
+    .description {
+      text-align: center;
+    }
+  }
+}

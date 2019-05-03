@@ -27,97 +27,69 @@ Load participant data and create index
 ```{r}
 boruta_p = read.csv("clean_data/ML_data/Participant_boruta.csv")
 boruta_p = caret_friendly(boruta_p)
-
-index_p = readRDS("Models/Participant_index.rds")
-
-#save the index - will be useful for meta-model
-saveRDS(index_p, "Models/Participant_index.rds")
+index = boruta_p$index
 ```
 
-
-Start parallel processing
-```{r}
-#library(doParallel)
-#cl <- makePSOCKcluster(2)
-#registerDoParallel(cl, cores = 2)
-#stopCluster(cl)
-```
 
 ```{r}
 fitControl = trainControl(
   method = "repeatedcv",
   number = 10,
-  repeats = (length(index_p)/10),
+  repeats = 20,
   adaptive = list(min = 5, alpha = 0.05, method = "gls", complete = TRUE),
   classProbs = TRUE,
   summaryFunction = twoClassSummary,
   allowParallel = F,
   verboseIter = FALSE,
   search = "random",
-  index = index_p,
+  index = index,
   savePredictions = "final"
 )
 ```
 
 ### Boruta
 ```{r}
-boruta_avNNet = train(
-  x = boruta_p$X_train,
-  y = boruta_p$Y_train ,
-  method = 'avNNet',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale"),
-  trace=F
-)
+boruta_avNNet = train(diagnosis ~ ., data = boruta_p$train, 
+                 method = "avNNet", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(boruta_avNNet, file="Models/Participant/boruta_avNNet.rds")
 rm(boruta_avNNet)
 
-boruta_xboost = train(
-  x = boruta_p$X_train,
-  y = boruta_p$Y_train ,
-  method = 'xgbTree',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+boruta_xboost = train(diagnosis ~ ., data = boruta_p$train, 
+                 method = "xgbTree", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(boruta_xboost, file="Models/Participant/boruta_xboost.rds")
 rm(boruta_xboost)
 
-boruta_rf = train(
-  x = boruta_p$X_train,
-  y = boruta_p$Y_train ,
-  method = 'rf',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+boruta_rf = train(diagnosis ~ ., data = boruta_p$train, 
+                 method = "rf", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(boruta_rf, file="Models/Participant/boruta_rf.rds")
 rm(boruta_rf)
 
-boruta_bayes = train(
-  x = boruta_p$X_train,
-  y = boruta_p$Y_train ,
-  method = 'naive_bayes',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+boruta_bayes = train(diagnosis ~ ., data = boruta_p$train, 
+                 method = 'naive_bayes', 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(boruta_bayes, file="Models/Participant/boruta_bayes.rds")
 rm(boruta_bayes)
 
-boruta_logistic = train(
-  x = boruta_p$X_train,
-  y = boruta_p$Y_train ,
-  method = 'plr',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+boruta_logistic = train(diagnosis ~ ., data = boruta_p$train, 
+                 method = "plr", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(boruta_logistic, file="Models/Participant/boruta_logistic.rds")
 rm(boruta_logistic)
@@ -129,67 +101,50 @@ rm(boruta_p)
 featexp_p = read.csv("clean_data/ML_data/Participant_featexp.csv")
 featexp_p = caret_friendly(featexp_p)
 
-featexp_avNNet = train(
-  x = featexp_p$X_train,
-  y = featexp_p$Y_train ,
-  method = 'avNNet',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale"),
-  trace=F
-)
+featexp_avNNet = train(diagnosis ~ ., data = featexp_p$train, 
+                 method = "avNNet", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(featexp_avNNet, file="Models/Participant/featexp_avNNet.rds")
 rm(featexp_avNNet)
 
-featexp_xboost = train(
-  x = featexp_p$X_train,
-  y = featexp_p$Y_train ,
-  method = 'xgbTree',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+featexp_xboost = train(diagnosis ~ ., data = featexp_p$train, 
+                 method = "xgbTree", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(featexp_xboost, file="Models/Participant/featexp_xboost.rds")
 rm(featexp_xboost)
 
-featexp_rf = train(
-  x = featexp_p$X_train,
-  y = featexp_p$Y_train ,
-  method = 'rf',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+featexp_rf = train(diagnosis ~ ., data = featexp_p$train, 
+                 method = "rf", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(featexp_rf, file="Models/Participant/featexp_rf.rds")
 rm(featexp_rf)
 
-featexp_bayes = train(
-  x = featexp_p$X_train,
-  y = featexp_p$Y_train ,
-  method = 'naive_bayes',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+featexp_bayes = train(diagnosis ~ ., data = featexp_p$train, 
+                 method = "naive_bayes", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(featexp_bayes, file="Models/Participant/featexp_bayes.rds")
 rm(featexp_bayes)
 
-featexp_logistic = train(
-  x = featexp_p$X_train,
-  y = featexp_p$Y_train ,
-  method = 'plr',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+featexp_logistic = train(diagnosis ~ ., data = featexp_p$train, 
+                 method = "plr", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(featexp_logistic, file="Models/Participant/featexp_logistic.rds")
 rm(featexp_logistic)
-
 rm(featexp_p)
 ```
 
@@ -198,68 +153,237 @@ rm(featexp_p)
 uncorrelated_p = read.csv("clean_data/ML_data/Participant_uncorrelated.csv")
 uncorrelated_p = caret_friendly(uncorrelated_p)
 
-uncorrelated_avNNet = train(
-  x = uncorrelated_p$X_train,
-  y = uncorrelated_p$Y_train ,
-  method = 'avNNet',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale"),
-  trace=F
-)
+uncorrelated_avNNet = train(diagnosis ~ ., data = uncorrelated_p$train, 
+                 method = "avNNet", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(uncorrelated_avNNet, file="Models/Participant/uncorrelated_avNNet.rds")
 rm(uncorrelated_avNNet)
 
-uncorrelated_xboost = train(
-  x = uncorrelated_p$X_train,
-  y = uncorrelated_p$Y_train ,
-  method = 'xgbTree',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+uncorrelated_xboost = train(diagnosis ~ ., data = uncorrelated_p$train, 
+                 method = "xgbTree", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(uncorrelated_xboost, file="Models/Participant/uncorrelated_xboost.rds")
 rm(uncorrelated_xboost)
 
-uncorrelated_rf = train(
-  x = uncorrelated_p$X_train,
-  y = uncorrelated_p$Y_train ,
-  method = 'rf',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+uncorrelated_rf = train(diagnosis ~ ., data = uncorrelated_p$train, 
+                 method = "rf", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(uncorrelated_rf, file="Models/Participant/uncorrelated_rf.rds")
 rm(uncorrelated_rf)
 
-uncorrelated_bayes = train(
-  x = uncorrelated_p$X_train,
-  y = uncorrelated_p$Y_train ,
-  method = 'naive_bayes',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+uncorrelated_bayes = train(diagnosis ~ ., data = uncorrelated_p$train, 
+                 method = "naive_bayes", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(uncorrelated_bayes, file="Models/Participant/uncorrelated_bayes.rds")
 rm(uncorrelated_bayes)
 
-uncorrelated_logistic = train(
-  x = uncorrelated_p$X_train,
-  y = uncorrelated_p$Y_train ,
-  method = 'plr',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+uncorrelated_logistic = train(diagnosis ~ ., data = uncorrelated_p$train, 
+                 method = "plr", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(uncorrelated_logistic, file="Models/Participant/uncorrelated_logistic.rds")
 rm(uncorrelated_logistic)
 rm(uncorrelated_p)
 ```
+
+
+# 2 Interviewer models
+
+## 2.2 Model training
+
+Load interviewer data and create index
+```{r}
+boruta_i = read.csv("clean_data/ML_data/Interviewer_boruta.csv")
+boruta_i = caret_friendly(boruta_i)
+index = boruta_i$index
+```
+
+
+```{r}
+fitControl = trainControl(
+  method = "repeatedcv",
+  number = 10,
+  repeats = 20,
+  adaptive = list(min = 5, alpha = 0.05, method = "gls", complete = TRUE),
+  classProbs = TRUE,
+  summaryFunction = twoClassSummary,
+  allowParallel = F,
+  verboseIter = FALSE,
+  search = "random",
+  index = index,
+  savePredictions = "final"
+)
+```
+
+### Boruta
+```{r}
+boruta_avNNet = train(diagnosis ~ ., data = boruta_i$train, 
+                 method = "avNNet", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(boruta_avNNet, file="Models/Interviewer/boruta_avNNet.rds")
+rm(boruta_avNNet)
+
+boruta_xboost = train(diagnosis ~ ., data = boruta_i$train, 
+                 method = "xgbTree", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(boruta_xboost, file="Models/Interviewer/boruta_xboost.rds")
+rm(boruta_xboost)
+
+boruta_rf = train(diagnosis ~ ., data = boruta_i$train, 
+                 method = "rf", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(boruta_rf, file="Models/Interviewer/boruta_rf.rds")
+rm(boruta_rf)
+
+boruta_bayes = train(diagnosis ~ ., data = boruta_i$train, 
+                 method = 'naive_bayes', 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(boruta_bayes, file="Models/Interviewer/boruta_bayes.rds")
+rm(boruta_bayes)
+
+boruta_logistic = train(diagnosis ~ ., data = boruta_i$train, 
+                 method = "plr", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(boruta_logistic, file="Models/Interviewer/boruta_logistic.rds")
+rm(boruta_logistic)
+rm(boruta_i)
+```
+
+### Featexp
+```{r}
+featexp_p = read.csv("clean_data/ML_data/Interviewer_featexp.csv")
+featexp_p = caret_friendly(featexp_i)
+
+featexp_avNNet = train(diagnosis ~ ., data = featexp_i$train, 
+                 method = "avNNet", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(featexp_avNNet, file="Models/Interviewer/featexp_avNNet.rds")
+rm(featexp_avNNet)
+
+featexp_xboost = train(diagnosis ~ ., data = featexp_i$train, 
+                 method = "xgbTree", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(featexp_xboost, file="Models/Interviewer/featexp_xboost.rds")
+rm(featexp_xboost)
+
+featexp_rf = train(diagnosis ~ ., data = featexp_i$train, 
+                 method = "rf", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(featexp_rf, file="Models/Interviewer/featexp_rf.rds")
+rm(featexp_rf)
+
+featexp_bayes = train(diagnosis ~ ., data = featexp_i$train, 
+                 method = "naive_bayes", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(featexp_bayes, file="Models/Interviewer/featexp_bayes.rds")
+rm(featexp_bayes)
+
+featexp_logistic = train(diagnosis ~ ., data = featexp_i$train, 
+                 method = "plr", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(featexp_logistic, file="Models/Interviewer/featexp_logistic.rds")
+rm(featexp_logistic)
+rm(featexp_p)
+```
+
+### Uncorrelated
+```{r}
+uncorrelated_i = read.csv("clean_data/ML_data/Interviewer_uncorrelated.csv")
+uncorrelated_i = caret_friendly(uncorrelated_i)
+
+uncorrelated_avNNet = train(diagnosis ~ ., data = uncorrelated_i$train, 
+                 method = "avNNet", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(uncorrelated_avNNet, file="Models/Interviewer/uncorrelated_avNNet.rds")
+rm(uncorrelated_avNNet)
+
+uncorrelated_xboost = train(diagnosis ~ ., data = uncorrelated_i$train, 
+                 method = "xgbTree", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(uncorrelated_xboost, file="Models/Interviewer/uncorrelated_xboost.rds")
+rm(uncorrelated_xboost)
+
+uncorrelated_rf = train(diagnosis ~ ., data = uncorrelated_i$train, 
+                 method = "rf", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(uncorrelated_rf, file="Models/Interviewer/uncorrelated_rf.rds")
+rm(uncorrelated_rf)
+
+uncorrelated_bayes = train(diagnosis ~ ., data = uncorrelated_i$train, 
+                 method = "naive_bayes", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(uncorrelated_bayes, file="Models/Interviewer/uncorrelated_bayes.rds")
+rm(uncorrelated_bayes)
+
+uncorrelated_logistic = train(diagnosis ~ ., data = uncorrelated_i$train, 
+                 method = "plr", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
+
+saveRDS(uncorrelated_logistic, file="Models/Interviewer/uncorrelated_logistic.rds")
+rm(uncorrelated_logistic)
+rm(uncorrelated_i)
+```
+
+
+
 
 # Coordination
 
@@ -267,92 +391,71 @@ Load data and create index
 ```{r}
 boruta_c = read.csv("clean_data/ML_data/Coordination_boruta.csv")
 boruta_c = caret_friendly(boruta_c)
-
-index_c = readRDS("Models/Coordination_index.rds")
-saveRDS(index_c, "Models/Coordination_index.rds")
+index = boruta_c$index
 ```
 
 ```{r}
 fitControl = trainControl(
   method = "repeatedcv",
   number = 10,
-  repeats = (length(index_c)/10),
+  repeats = 20,
   adaptive = list(min = 5, alpha = 0.05, method = "gls", complete = TRUE),
   classProbs = TRUE,
   summaryFunction = twoClassSummary,
   allowParallel = F,
   verboseIter = FALSE,
   search = "random",
-  index = index_c,
+  index = index,
   savePredictions = "final"
 )
 ```
 
-
 ### Boruta
 ```{r}
-boruta_avNNet = train(
-  x = boruta_c$X_train,
-  y = boruta_c$Y_train ,
-  method = 'avNNet',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale"),
-  trace=F
-)
+boruta_avNNet = train(diagnosis ~ ., data = boruta_c$train, 
+                 method = "avNNet", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(boruta_avNNet, file="Models/Coordination/boruta_avNNet.rds")
 rm(boruta_avNNet)
 
-boruta_xboost = train(
-  x = boruta_c$X_train,
-  y = boruta_c$Y_train ,
-  method = 'xgbTree',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+boruta_xboost = train(diagnosis ~ ., data = boruta_c$train, 
+                 method = "xgbTree", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(boruta_xboost, file="Models/Coordination/boruta_xboost.rds")
 rm(boruta_xboost)
 
-boruta_rf = train(
-  x = boruta_c$X_train,
-  y = boruta_c$Y_train ,
-  method = 'rf',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+boruta_rf = train(diagnosis ~ ., data = boruta_c$train, 
+                 method = "rf", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(boruta_rf, file="Models/Coordination/boruta_rf.rds")
 rm(boruta_rf)
 
-boruta_bayes = train(
-  x = boruta_c$X_train,
-  y = boruta_c$Y_train ,
-  method = 'naive_bayes',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+boruta_bayes = train(diagnosis ~ ., data = boruta_c$train, 
+                 method = 'naive_bayes', 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(boruta_bayes, file="Models/Coordination/boruta_bayes.rds")
-
 rm(boruta_bayes)
 
-boruta_logistic = train(
-  x = boruta_c$X_train,
-  y = boruta_c$Y_train ,
-  method = 'plr',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+boruta_logistic = train(diagnosis ~ ., data = boruta_c$train, 
+                 method = "plr", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(boruta_logistic, file="Models/Coordination/boruta_logistic.rds")
 rm(boruta_logistic)
-
 rm(boruta_c)
 ```
 
@@ -361,67 +464,50 @@ rm(boruta_c)
 featexp_c = read.csv("clean_data/ML_data/Coordination_featexp.csv")
 featexp_c = caret_friendly(featexp_c)
 
-featexp_avNNet = train(
-  x = featexp_c$X_train,
-  y = featexp_c$Y_train ,
-  method = 'avNNet',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale"),
-  trace=F
-)
+featexp_avNNet = train(diagnosis ~ ., data = featexp_c$train, 
+                 method = "avNNet", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(featexp_avNNet, file="Models/Coordination/featexp_avNNet.rds")
 rm(featexp_avNNet)
 
-featexp_xboost = train(
-  x = featexp_c$X_train,
-  y = featexp_c$Y_train ,
-  method = 'xgbTree',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+featexp_xboost = train(diagnosis ~ ., data = featexp_c$train, 
+                 method = "xgbTree", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(featexp_xboost, file="Models/Coordination/featexp_xboost.rds")
 rm(featexp_xboost)
 
-featexp_rf = train(
-  x = featexp_c$X_train,
-  y = featexp_c$Y_train ,
-  method = 'rf',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+featexp_rf = train(diagnosis ~ ., data = featexp_c$train, 
+                 method = "rf", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(featexp_rf, file="Models/Coordination/featexp_rf.rds")
 rm(featexp_rf)
 
-featexp_bayes = train(
-  x = featexp_c$X_train,
-  y = featexp_c$Y_train ,
-  method = 'naive_bayes',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+featexp_bayes = train(diagnosis ~ ., data = featexp_c$train, 
+                 method = 'naive_bayes', 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(featexp_bayes, file="Models/Coordination/featexp_bayes.rds")
 rm(featexp_bayes)
 
-featexp_logistic = train(
-  x = featexp_c$X_train,
-  y = featexp_c$Y_train ,
-  method = 'plr',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+featexp_logistic = train(diagnosis ~ ., data = featexp_c$train, 
+                 method = "plr", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(featexp_logistic, file="Models/Coordination/featexp_logistic.rds")
 rm(featexp_logistic)
-
 rm(featexp_c)
 ```
 
@@ -430,63 +516,47 @@ rm(featexp_c)
 uncorrelated_c = read.csv("clean_data/ML_data/Coordination_uncorrelated.csv")
 uncorrelated_c = caret_friendly(uncorrelated_c)
 
-uncorrelated_avNNet = train(
-  x = uncorrelated_c$X_train,
-  y = uncorrelated_c$Y_train ,
-  method = 'avNNet',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale"),
-  trace=F
-)
+uncorrelated_avNNet = train(diagnosis ~ ., data = uncorrelated_c$train, 
+                 method = "avNNet", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(uncorrelated_avNNet, file="Models/Coordination/uncorrelated_avNNet.rds")
 rm(uncorrelated_avNNet)
 
-uncorrelated_xboost = train(
-  x = uncorrelated_c$X_train,
-  y = uncorrelated_c$Y_train ,
-  method = 'xgbTree',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+uncorrelated_xboost = train(diagnosis ~ ., data = uncorrelated_c$train, 
+                 method = "xgbTree", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(uncorrelated_xboost, file="Models/Coordination/uncorrelated_xboost.rds")
 rm(uncorrelated_xboost)
 
-uncorrelated_rf = train(
-  x = uncorrelated_c$X_train,
-  y = uncorrelated_c$Y_train ,
-  method = 'rf',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+uncorrelated_rf = train(diagnosis ~ ., data = uncorrelated_c$train, 
+                 method = "rf", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(uncorrelated_rf, file="Models/Coordination/uncorrelated_rf.rds")
 rm(uncorrelated_rf)
 
-uncorrelated_bayes = train(
-  x = uncorrelated_c$X_train,
-  y = uncorrelated_c$Y_train ,
-  method = 'naive_bayes',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+uncorrelated_bayes = train(diagnosis ~ ., data = uncorrelated_c$train, 
+                 method = 'naive_bayes', 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(uncorrelated_bayes, file="Models/Coordination/uncorrelated_bayes.rds")
 rm(uncorrelated_bayes)
 
-uncorrelated_logistic = train(
-  x = uncorrelated_c$X_train,
-  y = uncorrelated_c$Y_train ,
-  method = 'plr',
-  trControl = fitControl,
-  metric = "ROC",
-  preProcess = c("center", "scale")
-)
+uncorrelated_logistic = train(diagnosis ~ ., data = uncorrelated_c$train, 
+                 method = "plr", 
+                 trControl = fitControl,
+                 metric = "ROC",
+                 preProcess = c("center", "scale"))
 
 saveRDS(uncorrelated_logistic, file="Models/Coordination/uncorrelated_logistic.rds")
 rm(uncorrelated_logistic)

@@ -21,9 +21,9 @@ data_c = subset(data_c, set=="train")
 data_i = subset(data_i, set=="train")
 data_p = subset(data_p, set=="train")
 
-data_c = data_c[,c(-1,-3,-4,-53)]
-data_i = data_i[,c(-1,-3,-4,-29)]
-data_p = data_p[,c(-1,-3,-4,-29)]
+data_c = data_c[,c(-1,-3,-4,-38)]
+data_i = data_i[,c(-1,-3,-4,-22)]
+data_p = data_p[,c(-1,-3,-4,-22)]
 ```
 
 # Feature selection with Boruta
@@ -78,6 +78,10 @@ plot_boruta = function(result, data) {
 plot_c = plot_boruta(boruta_result_c, "Coordination")
 plot_i = plot_boruta(boruta_result_i, "Interviewer")
 plot_p = plot_boruta(boruta_result_p, "Participant")
+
+plot_c
+plot_i
+plot_p
 
 ggsave("Feature_selection/Coordination_boruta.jpg", plot_c, width = 14, height = 6)
 ggsave("Feature_selection/Interviewer_boruta.jpg", plot_i, width = 14, height = 6)
@@ -144,15 +148,12 @@ data_c$diagnosis = ifelse(data_c$diagnosis=="Control", 0, 1)
 data_c = data_c[,c(-1,-3,-4)]
 data_c$n_utterances = as.numeric(data_c$n_utterances)
 data_c$nbr.null = as.numeric(data_c$nbr.null)
-data_c$maxL = as.numeric(data_c$maxL)
 data_c$nbr.null_diff = as.numeric(data_c$nbr.null_diff)
 data_c$n_utterances_diff = as.numeric(data_c$n_utterances_diff)
-data_c$NRLINE_diff = as.numeric(data_c$NRLINE_diff)
-data_c$NRLINE = as.numeric(data_c$NRLINE)
 train_c = subset(data_c, set=="train")
 test_c = subset(data_c, set=="test")
-train_c = train_c[,-50]
-test_c = test_c[,-50]
+train_c = train_c[,-35]
+test_c = test_c[,-35]
 rm(data_c)
 
 library(reticulate)
@@ -161,49 +162,65 @@ use_condaenv("r-reticulate")
 featexp = import("featexp")
 
 featexp_c = featexp$get_trend_stats(data = train_c, data_test = test_c, target_col = "diagnosis")
-featexp_c = subset(featexp_c, Trend_correlation>0.80)
+featexp_c = subset(featexp_c, Trend_correlation>0.65)
 write.csv(featexp_c, "Feature_selection/Coordination_featexp.csv")
 
 #participant
-data_p = read.csv("clean_data/ML_ready/Final/interviewer_data_final.csv")
+data_p = read.csv("clean_data/ML_ready/Final/participant_data_final.csv")
 data_p$diagnosis = ifelse(data_p$diagnosis=="Control", 0, 1)
 data_p = data_p[,c(-1,-3,-4)]
 data_p$n_utterances = as.numeric(data_p$n_utterances)
 data_p$nbr.null = as.numeric(data_p$nbr.null)
-data_p$NRLINE = as.numeric(data_p$NRLINE)
 train_p = subset(data_p, set=="train")
 test_p = subset(data_p, set=="test")
-train_p = train_p[,-26]
-test_p = test_p[,-26]
+train_p = train_p[,-19]
+test_p = test_p[,-19]
 rm(data_p)
 
 featexp_p = featexp$get_trend_stats(data = train_p, data_test = test_p, target_col = "diagnosis")
-featexp_p = subset(featexp_p, Trend_correlation>0.80)
+featexp_p = subset(featexp_p, Trend_correlation>0.65)
 
 write.csv(featexp_p, "Feature_selection/Participant_featexp.csv")
+
+#interviewer
+data_i = read.csv("clean_data/ML_ready/Final/interviewer_data_final.csv")
+data_i$diagnosis = ifelse(data_i$diagnosis=="Control", 0, 1)
+data_i = data_i[,c(-1,-3,-4)]
+data_i$n_utterances = as.numeric(data_i$n_utterances)
+data_i$nbr.null = as.numeric(data_i$nbr.null)
+train_i = subset(data_i, set=="train")
+test_i = subset(data_i, set=="test")
+train_i = train_i[,-19]
+test_i = test_i[,-19]
+rm(data_i)
+
+featexp_i = featexp$get_trend_stats(data = train_i, data_test = test_i, target_col = "diagnosis")
+featexp_i = subset(featexp_i, Trend_correlation>0.65)
+
+write.csv(featexp_i, "Feature_selection/Interviewer_featexp.csv")
 
 rm(list=ls())
 ```
 
 # Select features
 
-The process is the same for all 3 datasets => function time
+The process is the same for all 3 datasets => function
 ```{r}
 selectFeat = function (type=c("C", "I", "P")) {
   if (type=="C") {
     name1 = "Coordination"
     name2 = "coordination"
-    set = 53
+    set = 38
   }
   if (type=="I") {
     name1 = "Interviewer"
     name2 = "interviewer"
-    set = 34
+    set = 22
   }
   if (type=="P") {
     name1 = "Participant"
     name2 = "participant"
-    set = 29
+    set = 22
   }
   
   info_cols = c(1:4, set)

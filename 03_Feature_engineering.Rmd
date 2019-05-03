@@ -24,7 +24,7 @@ data_p = data_p[,c(-23,-25,-27)]
 Some additional features about coordination can be created - linear combination of single signal features, most efficient might be difference (patient-interviewer).
 ```{r}
 #quantify the difference between the interviewer's and participant's gesturing systems - patient-interviewer
-difference_features = data_p[,5:34]-data_i[,5:34]
+difference_features = data_p[,5:25]-data_i[,5:25]
 
 #rename the columns to avoid duplicate column names
 col_names = colnames(difference_features)

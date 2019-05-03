@@ -225,55 +225,28 @@ Hypothesis:
     - in participant - NO
     - in coordination - YES, coordination systems emerge over time
 
-Use best participant model and the worst coordination model to get stronger evidence of main hypothesis
+
 ```{r}
 results_c = data.frame(ID = subset(c_data$no_model, set=="test")$ID,
                        diagnosis = c_data$Y_test,
                        time = subset(c_data$no_model, set=="test")$time)
-results_p = data.frame(ID = subset(p_data$no_model, set=="test")$ID,
-                       diagnosis = p_data$Y_test,
-                       time = subset(p_data$no_model, set=="test")$time)
 
 prediction_c = predict(best_c$featexp_xboost, c_data$X_test, type = "prob")
-prediction_p = predict(best_p$boruta_xboost, p_data$X_test, type = "prob")
 
 results_c = cbind(results_c, prediction_c)
-results_p = cbind(results_p ,prediction_p)
 
 results_c$diagnosis = ifelse(results_c$diagnosis=="Control", 0, 1)
 results_c$rmse = ifelse(results_c$diagnosis==0, 1-results_c$Control, 1-results_c$Schizophrenic)
 
-results_p$diagnosis = ifelse(results_p$diagnosis=="Control", 0, 1)
-results_p$rmse = ifelse(results_p$diagnosis==0, 1-results_p$Control, 1-results_p$Schizophrenic)
-
-results_c$set = "coordination"
-results_p$set = "participant"
-
-results = rbind(results_c, results_p)
-results$model = "xgb"
-
-results_all = rbind(results_all, results)
-
-#test participant model
-time_participant = lmer(rmse ~ time +(1|ID), results_p)
-time_coordination = lmer(rmse ~ time +(1|ID), results_c)
-
-summary(time_participant)
-summary(time_coordination)
-
+#test prediction over time
 library(lmerTest)
-acc_model = lmer(rmse ~ set +(1|ID), results_all)
+time_coordination = lmer(rmse ~ time +(1|ID), results_c)
+time = summary(time_coordination)
+time = time$coefficients
+time = round(time,5)
+time
 
-summary(acc_model)
-
-
-
-#acc_time model shows both better performance of coordination model and that there is no significant change in performance over time
-model_comparison = summary(acc_model)
-model_comparison = round(model_comparison$coefficients,3)
-model_comparison
-
-write.csv(model_comparison, "Model_evaluation/Coordination_vs_participant.csv")
+write.csv(time, "Model_evaluation/Performance_over_time.csv")
 ```
 
 Result - no increase in performance over time
@@ -296,7 +269,7 @@ source("Scripts/modelling_fuctions.R")
 models = load_models("C")
 models = models[(startsWith(names(models), "featexp"))]
 data = read.csv("clean_data/ML_data/Coordination_featexp.csv")
-data = subset(data, set=="test")
+data = subset(data, set=="train")
 data = data[,c(-1, -3:-5)]
 ```
 
@@ -328,19 +301,21 @@ performance_rf = model_performance(expl_rf)
 performance_xgb = model_performance(expl_xgb)
 
 #plot the residuals
-residual_distribution = plot(performance_nn, 
+residual_distribution_train = plot(performance_nn, 
      performance_bayes, 
      performance_log, 
      performance_rf, 
      performance_xgb, geom = "boxplot", outliers=1)+
   theme_few()+
   scale_fill_few()+
-  labs(title = "Distribution of residuals", x="Residuals")+
+  labs(title = "Training", x="Residuals")+
   guides(fill=F)
 
-residual_distribution
+library(gridExtra)
+library(grid)
+residual_distribution = grid.arrange(residual_distribution_train, residual_distribution_test, nrow=2, top=textGrob("Distribution of residuals", gp=gpar(fontsize=15, font=2)))
 
-ggsave("Model_interpretation/Residuals.jpg", width = 7, height = 4)
+ggsave("Model_interpretation/Residuals.jpg", residual_distribution, width = 7, height = 5)
 ```
 
 ### Feature importance

@@ -69,6 +69,7 @@ split_all = function(folder="clean_data/Gesture") {
     file = all_files[i]
     loss = try(split_actigraph(file))
     all_losses = try(rbind(all_losses, loss))
+    print(i)
     }
   try(write.csv(all_losses, "clean_data/Split_data/data_loss_single.csv", row.names = F))
   
@@ -132,7 +133,7 @@ merge_signals = function(filename) {
   colnames(data_interviewer) = c("PsychologistJerkLeft", "PsychologistJerkRight", "time_int", "utterance_n_int")
   
   data_participant = data_participant[,c(-4,-6)]
-  colnames(data_participant) = c("ParticipanttJerkLeft", "ParticipantJerkRight", "time_par", "utterance_n_par")
+  colnames(data_participant) = c("ParticipantJerkLeft", "ParticipantJerkRight", "time_par", "utterance_n_par")
   
   coordination_pair = cbind(data_interviewer, data_participant)
   
@@ -153,10 +154,10 @@ merge_signals = function(filename) {
     } else coordination_pair = coordination_pair[,-3]
   }
   
-  #keep only the signal from dominant hand of the psychologist (which is always right) unless the signal contains more than 200 zeroes, then keep the other hand signal
-  if (sum(coordination_pair$PsychologistJerkRight==0)<500) {
-    coordination_pair = coordination_pair[,-1]
-  } else coordination_pair = coordination_pair[,-2]
+  #keep only the signal from dominant hand of the psychologist (which is always left) unless the signal contains more than 500 zeroes, then keep the other hand signal
+  if (sum(coordination_pair$PsychologistJerkLeft==0)<500) {
+    coordination_pair = coordination_pair[,-2]
+  } else coordination_pair = coordination_pair[,-1]
   
   #save the resulting file
   save_file = paste0("clean_data/Split_data/Coordination/", filename)
@@ -375,21 +376,24 @@ extract_features = function(file) {
   data = read.csv(file)
   utterances_features = try(extract_utterance_features(data))
   descriptive_features = try(extract_descriptive_features(data))
-  param = parameters = read.csv("clean_data/Split_data/final_parameters.csv", row.names = 1)
-  rqa_features = try(extract_rqa(data, parameters = param))
+  #param = parameters = read.csv("clean_data/Split_data/final_parameters.csv", row.names = 1)
+  #rqa_features = try(extract_rqa(data, parameters = param))
   
   interviewer_features = try(cbind(info, 
                                utterances_features[[1]],
-                               descriptive_features[[1]],
-                               rqa_features[[1]]))
+                               descriptive_features[[1]]
+#                             ,rqa_features[[1]]
+                               ))
   participant_features = try(cbind(info,
                                utterances_features[[2]],
-                               descriptive_features[[2]],
-                               rqa_features[[2]]))
+                               descriptive_features[[2]]
+#                              ,rqa_features[[2]]
+                               ))
   coordination_features = try(cbind(info,
                                 utterances_features[[3]],
-                                descriptive_features[[3]],
-                                rqa_features[[3]]))
+                                descriptive_features[[3]]
+#                               ,rqa_features[[3]]
+                                                  ))
 
   output = list(interviewer_features, participant_features, coordination_features)
   

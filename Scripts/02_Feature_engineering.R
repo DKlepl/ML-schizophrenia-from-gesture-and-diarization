@@ -10,7 +10,9 @@ remove_no_match()
 create_coordination_pairs()
 
 #run parameter optimization
-run_optimization(folder = "clean_data/Split_data/Coordination")
-merge_parameters_all()
-select_parameters()
+#run_optimization(folder = "clean_data/Split_data/Coordination")
+#merge_parameters_all()
+#select_parameters()
+
+#extract features from signals
 extract_features_folder(folder = "clean_data/Split_data/Coordination")

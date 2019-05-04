@@ -53,10 +53,11 @@ caret_friendly = function(data) {
 
 
 #load all trained models
-load_models = function(which=c("C", "P")) {
+load_models = function(which=c("C", "P", "I")) {
   
   if (which=="C") path= "Models/Coordination"
   if (which=="P") path= "Models/Participant"
+  if (which=="I") path= "Models/Interviewer"
   
   models_path = list.files(path, full.names = T)
   models_list = list()

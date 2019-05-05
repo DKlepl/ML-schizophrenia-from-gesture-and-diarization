@@ -22,6 +22,7 @@ The list of algorithms trained:
 - Penalized Logistic Regression ('plr)
 
 ## 1.2 Model training
+NB boruta selected all features
 
 Load participant data and create index
 ```{r}
@@ -43,7 +44,8 @@ fitControl = trainControl(
   verboseIter = FALSE,
   search = "random",
   index = index,
-  savePredictions = "final"
+  savePredictions = "final",
+  sampling = "down"
 )
 ```
 
@@ -98,7 +100,8 @@ rm(boruta_p)
 
 ### Featexp
 ```{r}
-featexp_p = read.csv("clean_data/ML_data/Participant_featexp.csv")
+featexp_p = read.csv("cle
+                     an_data/ML_data/Participant_featexp.csv")
 featexp_p = caret_friendly(featexp_p)
 
 featexp_avNNet = train(diagnosis ~ ., data = featexp_p$train, 
@@ -280,8 +283,8 @@ rm(boruta_i)
 
 ### Featexp
 ```{r}
-featexp_p = read.csv("clean_data/ML_data/Interviewer_featexp.csv")
-featexp_p = caret_friendly(featexp_i)
+featexp_i = read.csv("clean_data/ML_data/Interviewer_featexp.csv")
+featexp_i = caret_friendly(featexp_i)
 
 featexp_avNNet = train(diagnosis ~ ., data = featexp_i$train, 
                  method = "avNNet", 
@@ -383,9 +386,7 @@ rm(uncorrelated_i)
 ```
 
 
-
-
-# Coordination
+# 3. Coordination
 
 Load data and create index
 ```{r}
@@ -563,13 +564,13 @@ rm(uncorrelated_logistic)
 rm(uncorrelated_c)
 ```
 
-#Model Evaluation
+# 4. Model Evaluation
 ```{r}
 library(caret)
 library(ggthemes)
 ```
 
-## Participant
+## 4.1 Participant
 
 Load all trained models
 ```{r}
@@ -616,8 +617,7 @@ write.csv(ranking_participant, "Model_evaluation/Feature_set_ranking_participant
 ```
 
 
-## Coordination
-
+## 4.2 Coordination
 Load all trained models
 ```{r}
 models_coordination = load_models(which = "C")
@@ -652,6 +652,51 @@ roc_c = ggplot(roc_coordination, aes(x=reorder(model, -mean), y=mean))+
 ggsave("Model_evaluation/ROC_coordination.jpg", roc_c, width = 7, height = 4)
 write.csv(roc_coordination, "Model_evaluation/ROC_coordination.csv", row.names = F)
 write.csv(feat_set_ranked, "Model_evaluation/Feature_set_ranking_coordination.csv", row.names = F)
+
+#plot roc_p and roc_c in one plot
+library(gridExtra)
+library(grid)
+
+ROC_all = grid.arrange(roc_p, roc_c, clip="on", ncol=2, top=textGrob("AUC of all fitted models", gp=gpar(fontsize=18, font=3)))
+ggsave("Model_evaluation/ROC_all_models.jpg", ROC_all, width = 8, height = 3)
+```
+
+
+## 4.3 Interviewer
+Load all trained models
+```{r}
+models_interviewer = load_models(which = "I")
+```
+
+## Resamples analysis
+```{r}
+resamples_i = resamples(models_interviewer)
+values = resamples_i$values[,(endsWith(names(resamples_i$values),"ROC"))]
+mean = sapply(values, FUN=mean)
+sd = sapply(values, FUN=sd)
+mean = as.data.frame(mean)
+sd = as.data.frame(sd)
+
+roc_interviewer = cbind(mean,sd)
+roc_interviewer$model = names(models_interviewer)
+roc_interviewer$feature_set = as.factor(c(rep("boruta",5), rep("featexp",5), rep("uncorrelated",5)))
+roc_interviewer = roc_interviewer[order(roc_interviewer$mean, decreasing = T),]
+row.names(roc_interviewer) = NULL
+roc_interviewer$rank = as.numeric(row.names(roc_interviewer))
+
+
+ranking_interviewer= roc_interviewer %>% group_by(feature_set) %>% summarise(sum=sum(rank))
+
+roc_i = ggplot(roc_interviewer, aes(x=reorder(model, -mean), y=mean))+
+  geom_point()+
+  geom_errorbar(aes(ymin=(mean+sd), ymax=(mean-sd)))+
+  theme_few()+
+  theme(axis.text.x = element_text(angle = 60, hjust = 1, size = 10, lineheight = 8))+
+  labs(x="Interviewer", y=NULL)
+
+ggsave("Model_evaluation/ROC_interviewer.jpg", roc_c, width = 7, height = 4)
+write.csv(roc_interviewer, "Model_evaluation/ROC_interviewer.csv", row.names = F)
+write.csv(feat_set_ranked, "Model_evaluation/Feature_set_ranking_interviewer.csv", row.names = F)
 
 #plot roc_p and roc_c in one plot
 library(gridExtra)

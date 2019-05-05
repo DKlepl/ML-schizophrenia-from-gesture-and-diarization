@@ -87,6 +87,8 @@ ggsave("Feature_selection/Coordination_boruta.jpg", plot_c, width = 14, height =
 ggsave("Feature_selection/Interviewer_boruta.jpg", plot_i, width = 14, height = 6)
 ggsave("Feature_selection/Participant_boruta.jpg", plot_p, width = 14, height = 6)
 ```
+Fit only the coordination data boruta selection. The rest is the full dataset.
+
 
 
 #Feature selection with MARS
@@ -100,7 +102,7 @@ earth_c_imp = evimp(earth_c)
 write.csv(earth_c_imp, "Feature_selection/Earth_coordination.csv")
 
 #interviewer
-earth_i = earth(diagnosis ~., data=data_i, degree = 1, glm = list(family=binomial), nfold = 10, ncross = 5, trace = 2)
+earth_i = try(earth(diagnosis ~., data=data_i, degree = 1, glm = list(family=binomial), nfold = 10, ncross = 5, trace = 2))
 
 earth_i_imp = evimp(earth_i)
 write.csv(earth_i_imp, "Feature_selection/Earth_interviewer.csv")
@@ -145,17 +147,29 @@ plot_earth(p, "Participant")
 library(caret)
 data_c = read.csv("clean_data/ML_ready/Final/coordination_data_final.csv")
 data_c$diagnosis = ifelse(data_c$diagnosis=="Control", 0, 1)
-data_c = data_c[,c(-1,-3,-4)]
 data_c$n_utterances = as.numeric(data_c$n_utterances)
 data_c$nbr.null = as.numeric(data_c$nbr.null)
 data_c$nbr.null_diff = as.numeric(data_c$nbr.null_diff)
 data_c$n_utterances_diff = as.numeric(data_c$n_utterances_diff)
+data_c = subset(data_c, set=="train")
+data_c = data_c[,-38]
+
+#create train-test split
+ID = unique(data_c$ID)
+trainIndex = createDataPartition(ID, p=0.75, list = F)
+trainIndex = ID[trainIndex]
+inTrain = which(data_c$ID %in% trainIndex)
+
+data_c[-inTrain, "set"] = "test"
+data_c[inTrain, "set"] = "train"
+data_c = data_c[,c(-1,-3,-4)]
+
 train_c = subset(data_c, set=="train")
 test_c = subset(data_c, set=="test")
 train_c = train_c[,-35]
 test_c = test_c[,-35]
 rm(data_c)
-
+  
 library(reticulate)
 use_condaenv("r-reticulate")
 
@@ -168,9 +182,19 @@ write.csv(featexp_c, "Feature_selection/Coordination_featexp.csv")
 #participant
 data_p = read.csv("clean_data/ML_ready/Final/participant_data_final.csv")
 data_p$diagnosis = ifelse(data_p$diagnosis=="Control", 0, 1)
-data_p = data_p[,c(-1,-3,-4)]
 data_p$n_utterances = as.numeric(data_p$n_utterances)
 data_p$nbr.null = as.numeric(data_p$nbr.null)
+
+#create train-test split
+ID = unique(data_p$ID)
+trainIndex = createDataPartition(ID, p=0.75, list = F)
+trainIndex = ID[trainIndex]
+inTrain = which(data_c$ID %in% trainIndex)
+
+data_p[-inTrain, "set"] = "test"
+data_p[inTrain, "set"] = "train"
+data_p = data_p[,c(-1,-3,-4)]
+
 train_p = subset(data_p, set=="train")
 test_p = subset(data_p, set=="test")
 train_p = train_p[,-19]
@@ -185,12 +209,22 @@ write.csv(featexp_p, "Feature_selection/Participant_featexp.csv")
 #interviewer
 data_i = read.csv("clean_data/ML_ready/Final/interviewer_data_final.csv")
 data_i$diagnosis = ifelse(data_i$diagnosis=="Control", 0, 1)
-data_i = data_i[,c(-1,-3,-4)]
 data_i$n_utterances = as.numeric(data_i$n_utterances)
 data_i$nbr.null = as.numeric(data_i$nbr.null)
+
+#create train-test split
+ID = unique(data_i$ID)
+trainIndex = createDataPartition(ID, p=0.75, list = F)
+trainIndex = ID[trainIndex]
+inTrain = which(data_i$ID %in% trainIndex)
+
+data_i[-inTrain, "set"] = "test"
+data_i[inTrain, "set"] = "train"
+data_i= data_i[,c(-1,-3,-4)]
+
 train_i = subset(data_i, set=="train")
 test_i = subset(data_i, set=="test")
-train_i = train_i[,-19]
+train_i= train_i[,-19]
 test_i = test_i[,-19]
 rm(data_i)
 
